@@ -23,6 +23,7 @@ ORDER=(
     ufw
     pkg
     cra
+    per
 )
 
 # ------------------------------------------------------------
@@ -38,6 +39,7 @@ declare -A SCRIPT_MAP=(
     [ufw]="services/ufw.sh"
     [pkg]="rm_stuff/bad_pkg.sh"
     [cra]="rm_stuff/pwd_cracking_search.sh"
+    [per]="misc/file_permissions.sh"
 )
 
 # ------------------------------------------------------------
@@ -53,6 +55,7 @@ declare -A DESCRIPTION=(
     [ufw]="Configure UFW"
     [pkg]="Remove bad packages"
     [cra]="Password cracker search"
+    [per]="File permissions"
 )
 
 echo "Available scripts:"
