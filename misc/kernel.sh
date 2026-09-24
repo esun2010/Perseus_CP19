@@ -5,17 +5,9 @@
 # CyberPatriot-safe Linux hardening script (refined, conservative)
 ###############################################################################
 
-LOG_FILE="/var/log/cyberpatriot-hardening.log"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../logging.sh"
 SYSCTL_FILE="/etc/sysctl.d/99-hardening.conf"
-
-log() {
-    local msg="$1"
-    # Try logging to file, but don't break if it fails
-    echo "[+] $msg"
-    if [ -w "$(dirname "$LOG_FILE")" ] || [ ! -e "$LOG_FILE" ]; then
-        echo "$(date '+%F %T') [HARDEN] $msg" >> "$LOG_FILE" 2>/dev/null || true
-    fi
-}
 
 # Ensure root
 if [[ $EUID -ne 0 ]]; then
@@ -23,16 +15,19 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-touch "$LOG_FILE" 2>/dev/null || true
+init_logging
 
 ###############################################################################
 # Helpers
 ###############################################################################
 
 ensure_sysctl_file() {
-    mkdir -p /etc/sysctl.d
+    if [[ ! -d /etc/sysctl.d ]]; then
+        mkdir -p /etc/sysctl.d || { log "FAILED creating /etc/sysctl.d"; return 1; }
+        log "CREATED directory: /etc/sysctl.d"
+    fi
     if [[ ! -f "$SYSCTL_FILE" ]]; then
-        touch "$SYSCTL_FILE"
+        touch "$SYSCTL_FILE" || { log "FAILED creating $SYSCTL_FILE"; return 1; }
         log "Created $SYSCTL_FILE"
     fi
 }
@@ -42,28 +37,33 @@ backup_once() {
     local marker="$file.cp_hardened_backup_done"
     if [[ -f "$file" && ! -f "$marker" ]]; then
         local backup="${file}.bak.$(date +%s)"
-        cp "$file" "$backup"
-        touch "$marker"
+        cp "$file" "$backup" || { log "FAILED backing up $file"; return 1; }
         log "Backup created: $backup"
+        touch "$marker" || { log "FAILED creating $marker"; return 1; }
+        log "CREATED backup marker: $marker"
     fi
+}
+
+write_sysctl_setting() {
+    local key="$1" value="$2"
+    sed -i "/^[[:space:]]*${key//./\\.}[[:space:]]*=/d" "$SYSCTL_FILE" || return 1
+    echo "$key = $value" >> "$SYSCTL_FILE"
 }
 
 add_sysctl_setting() {
     local key="$1"
     local value="$2"
 
-    ensure_sysctl_file
-    backup_once "$SYSCTL_FILE"
-
-    # Remove existing lines for this key
-    sed -i "/^${key//./\\.}\s*=/d" "$SYSCTL_FILE"
-
-    echo "$key = $value" >> "$SYSCTL_FILE"
-    log "Set sysctl: $key = $value (persisted in $SYSCTL_FILE)"
+    ensure_sysctl_file || return 1
+    backup_once "$SYSCTL_FILE" || return 1
+    audit_file_change "$SYSCTL_FILE" write_sysctl_setting "$key" "$value" || return 1
 
     # Apply immediately, but don't abort on failure
+    local old new
+    old=$(sysctl -n "$key" 2>/dev/null) || old="<unavailable>"
     if sysctl -w "$key=$value" >/dev/null 2>&1; then
-        log "Applied sysctl at runtime: $key=$value"
+        new=$(sysctl -n "$key" 2>/dev/null) || new="<unavailable>"
+        [[ "$old" == "$new" ]] || log "CHANGED runtime sysctl: $key: $old -> $new"
     else
         log "WARNING: Failed to apply sysctl at runtime: $key"
     fi
@@ -120,12 +120,15 @@ harden_mountpoint() {
     log "Hardening $path..."
 
     if [[ -d "$path" ]]; then
-        chmod 1777 "$path" 2>/dev/null || log "WARNING: Failed to chmod 1777 $path"
+        audit_chmod 1777 "$path"
     fi
 
     if mountpoint -q "$path"; then
+        local old new
+        old=$(findmnt -n -o OPTIONS --target "$path") || old="<unavailable>"
         if mount -o remount,noexec,nosuid,nodev "$path" 2>/dev/null; then
-            log "$path remounted with noexec,nosuid,nodev"
+            new=$(findmnt -n -o OPTIONS --target "$path") || new="<unavailable>"
+            log "REMOUNTED $path: $old -> $new"
         else
             log "WARNING: Failed to remount $path with noexec,nosuid,nodev"
         fi
@@ -134,31 +137,40 @@ harden_mountpoint() {
     fi
 }
 
+write_fstab_entry() {
+    local path="$1" fstab="$2"
+    local temp
+    temp=$(mktemp "${fstab}.XXXXXX") || return 1
+    # Preserve ownership and permissions when replacing fstab.
+    cp -p -- "$fstab" "$temp" || { rm -f -- "$temp"; return 1; }
+    awk -v tgt="$path" '
+    $2 == tgt && $1 !~ /^#/ {
+        n=split($4, a, ",")
+        delete seen
+        opts=""
+        for (i=1; i<=n; i++) {
+            if (!seen[a[i]]++) opts=opts (opts == "" ? "" : ",") a[i]
+        }
+        n=split("noexec,nosuid,nodev", a, ",")
+        for (i=1; i<=n; i++) {
+            if (!seen[a[i]]++) opts=opts (opts == "" ? "" : ",") a[i]
+        }
+        if ($4 != opts) $4=opts
+    }
+    {print}
+    ' "$fstab" > "$temp" && mv -- "$temp" "$fstab" && return 0
+    rm -f -- "$temp"
+    return 1
+}
+
 harden_fstab_entry() {
     local path="$1"
     local fstab="/etc/fstab"
 
-    backup_once "$fstab"
+    backup_once "$fstab" || return 1
 
     if grep -qE "^[^#].*\s${path//\//\\/}\s" "$fstab"; then
-        # De-duplicate and ensure options
-        awk -v tgt="$path" '
-        $2 == tgt && $1 !~ /^#/ {
-            n=split($4, a, ",")
-            delete seen
-            for (i=1; i<=n; i++) seen[a[i]]=1
-            seen["noexec"]=1
-            seen["nosuid"]=1
-            seen["nodev"]=1
-            opts=""
-            for (k in seen) {
-                if (opts == "") opts=k; else opts=opts","k
-            }
-            $4=opts
-        }
-        {print}
-        ' "$fstab" > "${fstab}.tmp" && mv "${fstab}.tmp" "$fstab"
-        log "Updated $path options in /etc/fstab to include noexec,nosuid,nodev (deduplicated)"
+        audit_file_change "$fstab" write_fstab_entry "$path" "$fstab"
     else
         log "No explicit $path entry in /etc/fstab; leaving as-is."
     fi

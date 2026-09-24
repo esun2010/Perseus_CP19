@@ -5,6 +5,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_FILE="$SCRIPT_DIR/world_files.txt"
+source "$SCRIPT_DIR/../logging.sh"
 
 echo "========================================"
 echo " Linux Permission Hardening"
@@ -17,6 +18,8 @@ if [ "$EUID" -ne 0 ]; then
     echo "sudo $0"
     exit 1
 fi
+
+init_logging
 
 echo "[+] Configuring important file permissions..."
 
@@ -36,8 +39,7 @@ declare -A FILE_PERMS=(
 
 for FILE in "${!FILE_PERMS[@]}"; do
     if [ -e "$FILE" ]; then
-        chmod "${FILE_PERMS[$FILE]}" "$FILE"
-        echo "    $FILE -> ${FILE_PERMS[$FILE]}"
+        audit_chmod "${FILE_PERMS[$FILE]}" "$FILE"
     fi
 done
 
@@ -56,8 +58,7 @@ declare -A DIR_PERMS=(
 
 for DIR in "${!DIR_PERMS[@]}"; do
     if [ -d "$DIR" ]; then
-        chmod "${DIR_PERMS[$DIR]}" "$DIR"
-        echo "    $DIR -> ${DIR_PERMS[$DIR]}"
+        audit_chmod "${DIR_PERMS[$DIR]}" "$DIR"
     fi
 done
 
@@ -68,8 +69,7 @@ echo "[+] Securing user home directories..."
 if [ -d /home ]; then
     for HOME_DIR in /home/*; do
         if [ -d "$HOME_DIR" ]; then
-            chmod 700 "$HOME_DIR"
-            echo "    $HOME_DIR -> 700"
+            audit_chmod 700 "$HOME_DIR"
         fi
     done
 fi
@@ -79,6 +79,7 @@ echo "[+] Searching for world-writable files and directories..."
 echo "    This may take a while."
 
 # Start the output file
+write_world_report() {
 {
     echo "Linux World-Writable File/Directory Report"
     echo "Generated: $(date)"
@@ -108,6 +109,9 @@ find / \
     -type d \
     -perm -0002 \
     -print 2>/dev/null >> "$OUTPUT_FILE"
+}
+
+audit_file_change "$OUTPUT_FILE" write_world_report
 
 echo
 echo "[+] Report saved to:"
