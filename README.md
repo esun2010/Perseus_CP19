@@ -80,3 +80,88 @@ Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
 [Apache](https://httpd.apache.org/docs/2.4/mod/core.html),
 [vsftpd](https://manpages.ubuntu.com/manpages/jammy/man5/vsftpd.conf.5.html),
 [UFW](https://manpages.ubuntu.com/manpages/noble/man8/ufw.8.html).
+
+## File descriptions
+
+### Root files and shared helpers
+
+| File | Description |
+| --- | --- |
+| `README.md` | Explains how to select tasks, configure critical services, run checks, and understand the project files. |
+| `.gitattributes` | Tells Git to use Linux-style LF line endings for shell scripts. |
+| `run_all.sh` | Shows an interactive menu for all 13 task scripts and runs selected tasks in order. It skips unlisted services and skips UFW if a required service fails. |
+| `critical_services.txt` | Lists the services required by the scenario and any additional firewall ports to allow. Use one service per line, including `ufw` when needed, or `none` when no services are required. |
+| `all_logs.txt` | Stores the shared, accumulating audit log with timestamps and script names. Scripts using the logging helper record configuration changes, permissions, actions, and failures here. |
+| `logging.sh` | Provides shared functions for logging actions, comparing configuration files before and after edits, and recording permission changes. Other scripts source this helper rather than run it as a task. |
+| `lib/critical_services.sh` | Parses and validates the critical-service list, service aliases, and extra firewall port rules. It treats the text file as data rather than executable shell commands. |
+| `lib/service_common.sh` | Provides shared service prerequisites, package installation, startup checks, configuration backups, restoration, and setting-editing functions. The service scripts source this helper. |
+
+### General hardening and removal scripts
+
+| File | Description |
+| --- | --- |
+| `misc/kernel.sh` | Applies persistent and runtime sysctl hardening for networking and kernel protections. It also adjusts `/tmp` and `/dev/shm` permissions and mount options, including their existing fstab entries. |
+| `misc/login.sh` | Attempts to lock and delete the guest account, sets LightDM's `allow-guest=false`, and restarts LightDM. SSH configuration is handled separately by `services/ssh.sh`. |
+| `misc/file_permissions.sh` | Sets permissions on selected system files, directories, and user home directories. It also generates a report of world-writable files and directories. |
+| `password_management/pwd_policy.sh` | Sets password-aging defaults in `/etc/login.defs` and a minimum password length of 12 in `/etc/security/pwquality.conf`. It does not install or enable a PAM password-quality module. |
+| `password_management/reset_admin_pwd.sh` | Reads `auth_admins.txt` and resets each existing listed account to the script's `NEW_PASSWORD` value, currently `ChangeMe123!`. Edit that value before running if a different password is required. |
+| `rm_stuff/rm_mp3+.sh` | Deletes MP3, MOV, and MP4 files beneath `/`, excluding `/proc`, `/sys`, `/dev`, and `/run`. Each successful deletion or deletion failure is recorded in the shared log. |
+| `rm_stuff/bad_pkg.sh` | Presents a list of potentially unwanted packages for optional editing and asks for confirmation before purging installed matches. After removal, it runs package autoremove. |
+| `rm_stuff/pwd_cracking_search.sh` | Audits tools, packages, processes, hardware, remote access, scheduled jobs, and network listeners for indicators worth investigating. It prints findings and writes separate text reports under `rm_stuff/logs/` without automatically removing the findings. |
+
+### User audit files
+
+| File | Description |
+| --- | --- |
+| `user_management/user_management.sh` | Opens the authorized-user lists in nano, then audits local accounts with UID 1000 or higher and a usable login shell. It reports unauthorized users and sudo/wheel administrators without deleting accounts or changing group membership. |
+| `user_management/auth_users.txt` | Input list of authorized local usernames, one per line, based on the competition README. Blank lines and lines beginning with `#` are ignored. |
+| `user_management/auth_admins.txt` | Input list of authorized administrator usernames, one per line. Both the user audit and administrator password-reset script read this file. |
+| `user_management/unauth_users.txt` | Output list of audited users absent from `auth_users.txt`. The user audit overwrites this file each time it runs. |
+| `user_management/unauth_admins.txt` | Output list of audited sudo/wheel members absent from `auth_admins.txt`, excluding accounts already reported as unauthorized users. The user audit overwrites this file each time it runs. |
+
+### Service scripts
+
+| File | Description |
+| --- | --- |
+| `services/ssh.sh` | Installs OpenSSH, applies global login restrictions, validates its configuration, and starts/enables SSH at boot. It backs up and restores the main configuration if validation or startup fails. |
+| `services/apache2.sh` | Installs Apache2 and adds a configuration that reduces version disclosure and disables TRACE while retaining existing sites. It validates the configuration, starts/enables Apache at boot, and rolls back its configuration changes on failure. |
+| `services/vsftpd.sh` | Installs vsftpd, disables anonymous access, enables local logins and transfer logging, and configures passive ports 40000–40100. It requires FTPS by default, starts/enables the service at boot, and restores its configuration if startup fails. |
+| `services/ufw.sh` | Installs UFW, discovers required service ports, adds allow rules, and enables the firewall now and at boot. It applies deny-incoming/allow-outgoing defaults while retaining existing rules and supported SSH access ports. |
+
+### Tests
+
+| File | Description |
+| --- | --- |
+| `tests/logging_test.sh` | Tests configuration-change logs, permission logs, and media-deletion success and failure handling using temporary files and mocked commands. It does not run system hardening. |
+| `tests/services_test.sh` | Tests service-list parsing, interactive task selection, automatic service skipping, rejected command-line modes, and failure handling. It also checks firewall port discovery using temporary fixtures and mocked system commands. |
+
+### Generated text reports
+
+These files are created when the relevant scripts run and may not exist yet.
+The permission report and individual scan reports are overwritten on subsequent
+runs, unlike the accumulating `all_logs.txt`.
+
+| File | Description |
+| --- | --- |
+| `misc/world_files.txt` | Lists world-writable regular files and directories found by the permission-hardening script, along with the report generation time. |
+| `rm_stuff/logs/01_tools_in_path.txt` | Reports whether the scan's configured cracking-tool commands can be found in the command search path. |
+| `rm_stuff/logs/02_package_manager_check.txt` | Lists installed package records matching cracking-tool or GPU-computing keywords. |
+| `rm_stuff/logs/03_suspicious_processes.txt` | Lists running processes whose command lines match the scan's cracking-tool and GPU-computing keywords. |
+| `rm_stuff/logs/04_top_cpu.txt` | Shows the processes with the highest reported CPU usage. |
+| `rm_stuff/logs/05_gpu_pci_devices.txt` | Lists PCI graphics and display devices detected by `lspci`. |
+| `rm_stuff/logs/06_nvidia_gpu.txt` | Reports NVIDIA GPU memory information and process activity when `nvidia-smi` is available. |
+| `rm_stuff/logs/07_opencl_rocm.txt` | Records OpenCL device details and ROCm status when their inspection tools are available. |
+| `rm_stuff/logs/08_block_devices.txt` | Lists storage devices, models, connection types, sizes, and mount points. |
+| `rm_stuff/logs/09_usb_devices.txt` | Lists connected USB devices when `lsusb` is available. |
+| `rm_stuff/logs/10_usb_kernel_log.txt` | Collects matching USB and storage-related kernel messages from the previous 24 hours. |
+| `rm_stuff/logs/11_media_mounts.txt` | Lists mounted filesystems under `/media` or `/run/media`. |
+| `rm_stuff/logs/12_ssh_authorized_keys.txt` | Reports the presence and file metadata of SSH authorized-key files in user home directories and `/root`. It does not print the key contents. |
+| `rm_stuff/logs/13_ssh_sessions.txt` | Shows logged-in sessions and network connections matching SSH port 22. |
+| `rm_stuff/logs/14_cron_jobs.txt` | Shows the root crontab and directory listings for system cron locations and stored user crontabs. |
+| `rm_stuff/logs/15_systemd_units.txt` | Lists running services after filtering out several familiar service-name prefixes for manual review. |
+| `rm_stuff/logs/16_apt_dpkg_log.txt` | Extracts installation, upgrade, and removal entries from the last 200 lines of the available apt or dpkg log. |
+| `rm_stuff/logs/17_tmp_executables.txt` | Lists executable regular files found within two directory levels of `/tmp`, `/var/tmp`, and `/dev/shm`. |
+| `rm_stuff/logs/18_listening_sockets.txt` | Reports listening TCP and UDP sockets and associated process information where available. |
+| `rm_stuff/logs/19_nvidia_processes.txt` | Lists NVIDIA compute processes and their GPU-memory usage. This report is generated only when `nvidia-smi` is available. |
+| `rm_stuff/logs/20_summary.txt` | Summarizes simple indicators involving cracking tools, GPUs, and mounted storage to guide further investigation. These indicators do not establish whether activity is unauthorized. |
+| `rm_stuff/logs/21_remediation_steps.txt` | Contains suggested investigation and remediation steps for reviewing scan findings. These instructions are written to the report, not executed automatically. |
