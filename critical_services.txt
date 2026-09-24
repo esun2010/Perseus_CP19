@@ -1,0 +1,10 @@
+# Required services from the competition README, one per line.
+# Remove 'none' and uncomment the services your scenario requires.
+# Supported: ssh (sshd), apache2 (http/httpd), vsftpd (vsftp/ftp), ufw.
+# UFW is also skipped unless listed. Uncomment ufw to enable firewall setup.
+# Other services: allow PORT/tcp or allow START:END/udp, e.g. allow 3306/tcp
+# ssh
+# apache2
+# vsftpd
+ufw
+
