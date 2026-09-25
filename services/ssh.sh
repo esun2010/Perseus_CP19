@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../lib/service_common.sh"
+source "$SCRIPT_DIR/../service_helpers/service_common.sh"
 service_init
 install_packages openssh-server
 config=/etc/ssh/sshd_config

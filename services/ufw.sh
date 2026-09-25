@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 export LC_ALL=C
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../lib/service_common.sh"
+source "$SCRIPT_DIR/../service_helpers/service_common.sh"
 service_init
 load_critical_services "$REPO_DIR/critical_services.txt"
 install_packages ufw iproute2

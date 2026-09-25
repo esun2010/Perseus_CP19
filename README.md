@@ -30,13 +30,23 @@ sudo bash run_all.sh
 The launcher only accepts interactive selection; command-line arguments and
 the former `services` mode are removed. Every task script is shown in the menu.
 Enter its displayed keywords separated by spaces, or enter `all` to select
-every task. Shared helper libraries and test scripts are not runnable tasks.
+every task. Press Enter without keywords to resume unfinished eligible tasks in
+order, starting with the first `not_run` task. Explicit keywords (or `all`)
+rerun completed tasks. Shared helper libraries and test scripts are not runnable tasks.
 All service scripts, including UFW, are automatically skipped unless listed
-in `critical_services.txt`, even if explicitly selected. The menu marks them.
+in `critical_services.txt`, even if explicitly selected. The menu and final
+status list show `ran` for tasks completed successfully across launcher runs,
+`not_run` for tasks that have not completed successfully, and `N/a` for services
+not listed as critical. Failed tasks and tasks blocked by a failed service stay
+`not_run`; the result summary gives the failure or skip reason. Progress is saved after each successful task in the local, Git-ignored
+`.run_all_status` file. A rerun clears its previous success before starting, so
+failure or interruption leaves it retryable. Remove `.run_all_status` to reset
+all progress for a new scenario.
 `all` includes account/password changes, package removal, and media deletion;
 their existing prompts remain. Selecting an eligible service also selects UFW
 if UFW is critical. Selecting critical UFW also sets up all listed
-services so their actual ports can be discovered. A failed service causes UFW
+services so their actual ports can be discovered. When resuming, already
+completed services are skipped; UFW is refreshed when a service is retried. A failed service causes UFW
 to be skipped, and the launcher returns a failure summary. Other existing
 scripts may also affect service accounts and files; review the scenario first.
 
@@ -93,8 +103,8 @@ Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
 | `critical_services.txt` | Lists the services required by the scenario and any additional firewall ports to allow. Use one service per line, including `ufw` when needed, or `none` when no services are required. |
 | `all_logs.txt` | Stores the shared, accumulating audit log with timestamps and script names. Scripts using the logging helper record configuration changes, permissions, actions, and failures here. |
 | `logging.sh` | Provides shared functions for logging actions, comparing configuration files before and after edits, and recording permission changes. Other scripts source this helper rather than run it as a task. |
-| `lib/critical_services.sh` | Parses and validates the critical-service list, service aliases, and extra firewall port rules. It treats the text file as data rather than executable shell commands. |
-| `lib/service_common.sh` | Provides shared service prerequisites, package installation, startup checks, configuration backups, restoration, and setting-editing functions. The service scripts source this helper. |
+| `service_helpers/critical_services.sh` | Parses and validates the critical-service list, service aliases, and extra firewall port rules. It treats the text file as data rather than executable shell commands. |
+| `service_helpers/service_common.sh` | Provides shared service prerequisites, package installation, startup checks, configuration backups, restoration, and setting-editing functions. The service scripts source this helper. |
 
 ### General hardening and removal scripts
 

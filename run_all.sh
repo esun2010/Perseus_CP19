@@ -5,7 +5,7 @@ if (($#)); then
     exit 1
 fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/lib/critical_services.sh"
+source "$SCRIPT_DIR/service_helpers/critical_services.sh"
 load_critical_services "$SCRIPT_DIR/critical_services.txt" || exit 1
 
 # General tasks first, required services next, firewall last.
@@ -40,19 +40,57 @@ declare -A DESCRIPTION=(
     [vsftpd]='Install/configure FTP/FTPS'
     [ufw]='Configure firewall for critical services'
 )
-for key in "${ORDER[@]}"; do
-    note=''
-    if [[ "${SCRIPT_MAP[$key]}" == services/* ]] && ! critical_service "$key"; then
-        note=' [skipped: not critical]'
+# Store task keywords as data, never as executable shell code.
+STATE_FILE="$SCRIPT_DIR/.run_all_status"
+declare -A COMPLETED=()
+if [[ -e "$STATE_FILE" ]]; then
+    [[ -r "$STATE_FILE" ]] || { echo "Cannot read $STATE_FILE" >&2; exit 1; }
+    while IFS= read -r saved_key || [[ -n "$saved_key" ]]; do
+        for key in "${ORDER[@]}"; do
+            [[ "$saved_key" != "$key" ]] || COMPLETED["$key"]=1
+        done
+    done < "$STATE_FILE"
+fi
+save_status() {
+    local temporary key
+    temporary=$(mktemp "$STATE_FILE.XXXXXX") || return 1
+    if ! (
+        for key in "${ORDER[@]}"; do
+            if [[ -n "${COMPLETED[$key]:-}" ]]; then printf '%s\n' "$key"; fi
+        done
+    ) > "$temporary" || ! mv -f -- "$temporary" "$STATE_FILE"; then
+        rm -f -- "$temporary"
+        return 1
     fi
-    printf '%-8s %s%s\n' "$key" "${DESCRIPTION[$key]}" "$note"
+}
+
+declare -A TASK_STATUS=()
+for key in "${ORDER[@]}"; do
+    TASK_STATUS["$key"]=not_run
+    [[ -z "${COMPLETED[$key]:-}" ]] || TASK_STATUS["$key"]=ran
+    if [[ "${SCRIPT_MAP[$key]}" == services/* ]] && ! critical_service "$key"; then
+        TASK_STATUS["$key"]='N/a'
+    fi
 done
+show_task_status() {
+    local key
+    for key in "${ORDER[@]}"; do
+        printf '%-8s %-8s %s\n' "$key" "${TASK_STATUS[$key]}" "${DESCRIPTION[$key]}"
+    done
+}
+show_task_status
 printf 'Critical services: %s\n' "${CRITICAL_SERVICES[*]:-none}"
-read -r -p "Enter script keywords (space-separated), or 'all': " -a INPUT || {
+read -r -p "Enter keywords, 'all' to rerun all, or press Enter to resume: " -a INPUT || {
     echo 'No selection received.' >&2; exit 1;
 }
-((${#INPUT[@]})) || { echo 'No tasks selected.' >&2; exit 1; }
 declare -A SELECTED=()
+RESUME=0
+if ((${#INPUT[@]} == 0)); then
+    RESUME=1
+    for key in "${ORDER[@]}"; do
+        [[ "${TASK_STATUS[$key]}" != not_run ]] || SELECTED["$key"]=1
+    done
+fi
 for key in "${INPUT[@]}"; do
     case "$key" in
         all)
@@ -77,7 +115,11 @@ for key in ssh apache2 vsftpd ufw; do
 done
 # UFW needs configured, running critical services to discover the actual ports.
 if [[ -n "${SELECTED[ufw]:-}" ]]; then
-    for key in "${CRITICAL_SERVICES[@]}"; do SELECTED["$key"]=1; done
+    for key in "${CRITICAL_SERVICES[@]}"; do
+        if ((RESUME == 0)) || [[ "${TASK_STATUS[$key]}" != ran ]]; then
+            SELECTED["$key"]=1
+        fi
+    done
 fi
 SCRIPTS=()
 for key in "${ORDER[@]}"; do
@@ -97,14 +139,27 @@ FAILED=0
 service_failed=0
 for script in "${SCRIPTS[@]}"; do
     if [[ "$script" == services/ufw.sh && "$service_failed" == 1 ]]; then
+        unset 'COMPLETED[ufw]'
+        TASK_STATUS[ufw]=not_run
+        save_status || { echo "Cannot save task status to $STATE_FILE" >&2; exit 1; }
         RESULTS["$script"]='SKIPPED: required service failed'
         log "SKIPPED $script because a required service failed"
         FAILED=$((FAILED+1))
         continue
     fi
+    for key in "${ORDER[@]}"; do
+        [[ "${SCRIPT_MAP[$key]}" != "$script" ]] || break
+    done
+    # Clear previous success before a rerun so failure or interruption is retryable.
+    unset 'COMPLETED[$key]'
+    TASK_STATUS["$key"]=not_run
+    save_status || { echo "Cannot save task status to $STATE_FILE" >&2; exit 1; }
     log "RUN $script"
     if bash "$SCRIPT_DIR/$script"; then
         RESULTS["$script"]=PASS
+        COMPLETED["$key"]=1
+        TASK_STATUS["$key"]=ran
+        save_status || { echo "Cannot save task status to $STATE_FILE" >&2; exit 1; }
         log "PASS $script"
     else
         status=$?
@@ -115,4 +170,6 @@ for script in "${SCRIPTS[@]}"; do
     fi
 done
 for script in "${SCRIPTS[@]}"; do printf '%-45s %s\n' "$script" "${RESULTS[$script]}"; done
+printf '\nTask status:\n'
+show_task_status
 ((FAILED == 0))
