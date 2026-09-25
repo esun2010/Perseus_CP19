@@ -20,7 +20,7 @@ configure_ssh() {
     rm -f "$temp"
 }
 audit_file_change "$config" configure_ssh
-audit_chmod 600 "$config"
+secure_service_permissions ssh
 install -d -m 755 /run/sshd
 if ! /usr/sbin/sshd -t; then
     restore_config "$config" "$backup"

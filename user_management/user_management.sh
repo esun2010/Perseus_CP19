@@ -20,11 +20,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-AUTH_USERS_FILE="$SCRIPT_DIR/auth_users.txt"
-AUTH_ADMINS_FILE="$SCRIPT_DIR/auth_admins.txt"
+AUTH_USERS_FILE="$SCRIPT_DIR/../input/auth_users.txt"
+AUTH_ADMINS_FILE="$SCRIPT_DIR/../input/auth_admins.txt"
+mkdir -p "$SCRIPT_DIR/../log" || exit 1
 nano "$AUTH_USERS_FILE" "$AUTH_ADMINS_FILE"
-UNAUTH_USERS_FILE="$SCRIPT_DIR/unauth_users.txt"
-UNAUTH_ADMINS_FILE="$SCRIPT_DIR/unauth_admins.txt"
+UNAUTH_USERS_FILE="$SCRIPT_DIR/../log/unauth_users.txt"
+UNAUTH_ADMINS_FILE="$SCRIPT_DIR/../log/unauth_admins.txt"
 
 if [[ $EUID -ne 0 ]]; then
   echo "This script must be run as root (use sudo)." >&2

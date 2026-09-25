@@ -4,8 +4,9 @@
 # ---------------------------------
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OUTPUT_FILE="$SCRIPT_DIR/world_files.txt"
+OUTPUT_FILE="$SCRIPT_DIR/../log/world_files.txt"
 source "$SCRIPT_DIR/../logging.sh"
+source "$SCRIPT_DIR/../service_helpers/permissions.sh"
 
 echo "========================================"
 echo " Linux Permission Hardening"
@@ -20,6 +21,11 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 init_logging
+mkdir -p "$SCRIPT_DIR/../log" || exit 1
+secure_auth_permissions || exit 1
+for service in ssh apache2 vsftpd ufw; do
+    secure_service_permissions "$service" || exit 1
+done
 
 echo "[+] Configuring important file permissions..."
 
@@ -30,7 +36,7 @@ declare -A FILE_PERMS=(
     ["/etc/group"]="644"
     ["/etc/gshadow"]="640"
     ["/etc/sudoers"]="440"
-    ["/etc/ssh/sshd_config"]="644"
+    ["/etc/ssh/sshd_config"]="600"
     ["/etc/crontab"]="644"
     ["/etc/fstab"]="644"
     ["/etc/hosts"]="644"

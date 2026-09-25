@@ -17,7 +17,7 @@ configure_apache() {
     printf '%s\n' 'ServerTokens Prod' 'ServerSignature Off' 'TraceEnable Off' > "$config"
 }
 audit_file_change "$config" configure_apache
-audit_chmod 644 "$config"
+secure_service_permissions apache2
 a2enconf zz-cyberpatriot
 log 'ENABLED Apache configuration: zz-cyberpatriot'
 rollback_apache() {

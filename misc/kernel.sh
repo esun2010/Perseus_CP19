@@ -70,6 +70,146 @@ add_sysctl_setting() {
 }
 
 ###############################################################################
+# Administrator allowlist: sudoers and polkit
+###############################################################################
+
+load_admin_allowlist() {
+    local file="$SCRIPT_DIR/../input/auth_admins.txt" line uid
+    ADMIN_USERS=()
+    [[ -r "$file" ]] || { log "FAILED: cannot read $file"; return 1; }
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%$'\r'}"
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        # Keep generated sudoers and JavaScript free of injected syntax.
+        [[ "$line" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*[$]?$ ]] || {
+            log "FAILED: invalid administrator username: $line"; return 1;
+        }
+        uid=$(id -u -- "$line") || { log "FAILED: account does not exist: $line"; return 1; }
+        if [[ "$uid" == 0 ]]; then
+            [[ "$line" == root ]] || { log "FAILED: unexpected UID-zero account: $line"; return 1; }
+            continue
+        fi
+        [[ " ${ADMIN_USERS[*]} " == *" $line "* ]] || ADMIN_USERS+=("$line")
+    done < "$file"
+    ((${#ADMIN_USERS[@]} > 0)) || {
+        log "FAILED: auth_admins.txt must contain at least one existing non-root administrator"; return 1;
+    }
+}
+
+write_admin_sudoers() {
+    local user
+    cat <<'SUDOERS'
+# Managed by misc/kernel.sh using input/auth_admins.txt.
+# Deliberately no include directives: old grants must not bypass the allowlist.
+Defaults env_reset
+Defaults use_pty
+Defaults timestamp_timeout=0
+root ALL=(ALL:ALL) ALL
+SUDOERS
+    for user in "${ADMIN_USERS[@]}"; do
+        printf '%s ALL=(ALL:ALL) PASSWD: ALL\n' "$user"
+    done
+}
+
+write_admin_polkit() {
+    local user
+    cat <<'POLKIT'
+// Managed by misc/kernel.sh using input/auth_admins.txt.
+polkit.addAdminRule(function(action, subject) {
+    return ["unix-user:root"
+POLKIT
+    for user in "${ADMIN_USERS[@]}"; do
+        printf '        , "unix-user:%s"\n' "$user"
+    done
+    cat <<'POLKIT'
+    ];
+});
+POLKIT
+}
+
+# Write beside the destination, then rename to avoid exposing partial policies.
+install_admin_policy() {
+    local source="$1" target="$2" mode="$3" temporary
+    temporary=$(mktemp "${target}.tmp.XXXXXX") || return 1
+    if install -o root -g root -m "$mode" -- "$source" "$temporary" &&
+       mv -f -- "$temporary" "$target"; then
+        return 0
+    fi
+    rm -f -- "$temporary"
+    return 1
+}
+
+configure_admin_access() {
+    local sudoers=/etc/sudoers rules_dir=/etc/polkit-1/rules.d
+    local rule_name=00-cyberpatriot-admins.rules rule backup file name
+    local had_rule=0 failed=0
+    rule="$rules_dir/$rule_name"
+    load_admin_allowlist || return 1
+    command -v visudo >/dev/null || { log "FAILED: visudo is required"; return 1; }
+    command -v pkaction >/dev/null || { log "FAILED: polkit is required"; return 1; }
+    # Require the JavaScript rules backend; do not write ineffective legacy rules.
+    [[ -d /usr/share/polkit-1/rules.d ]] || {
+        log "FAILED: polkit JavaScript rules support is required"; return 1;
+    }
+    [[ -f "$sudoers" && ! -L "$sudoers" && ! -L "$rules_dir" && ! -L "$rule" ]] || {
+        log "FAILED: unexpected sudoers or polkit file layout"; return 1;
+    }
+    [[ ! -e "$rule" || -f "$rule" ]] || { log "FAILED: $rule is not a regular file"; return 1; }
+    visudo -c || { log "FAILED: existing sudoers configuration is invalid"; return 1; }
+    # Any earlier rule could install an administrator override. Fail for review.
+    local LC_ALL=C
+    for file in "$rules_dir"/*.rules /usr/share/polkit-1/rules.d/*.rules; do
+        [[ -e "$file" ]] || continue
+        name=${file##*/}
+        if [[ "$name" < "$rule_name" ]]; then
+            log "FAILED: polkit rule sorts before our allowlist; review $file"; return 1
+        fi
+    done
+    backup=$(mktemp -d /var/backups/cyberpatriot-admin-access.XXXXXX) || return 1
+    chmod 700 "$backup" || return 1
+    cp -p -- "$sudoers" "$backup/sudoers" || return 1
+    if [[ -e "$rule" ]]; then
+        cp -p -- "$rule" "$backup/polkit.rules" || return 1
+        had_rule=1
+    fi
+    log "Administrator policy backups: $backup (root-only)"
+    write_admin_sudoers > "$backup/new-sudoers" || return 1
+    write_admin_polkit > "$backup/new-polkit.rules" || return 1
+    visudo -cf "$backup/new-sudoers" || {
+        log "FAILED: generated sudoers did not validate; policies unchanged"; return 1;
+    }
+    mkdir -p -- "$rules_dir" || return 1
+    # Backups are retained even after success. Restore both policies on failure.
+    audit_file_change "$sudoers" install_admin_policy "$backup/new-sudoers" "$sudoers" 0440 || failed=1
+    if ((failed == 0)); then
+        visudo -c || failed=1
+    fi
+    if ((failed == 0)); then
+        audit_file_change "$rule" install_admin_policy "$backup/new-polkit.rules" "$rule" 0644 || failed=1
+    fi
+    if ((failed)); then
+        log "FAILED configuring administrator access; restoring policies from $backup"
+        audit_file_change "$sudoers" install_admin_policy "$backup/sudoers" "$sudoers" 0440 || {
+            log "CRITICAL: restore $backup/sudoers to $sudoers manually"; return 1;
+        }
+        if ((had_rule)); then
+            audit_file_change "$rule" install_admin_policy "$backup/polkit.rules" "$rule" 0644 || return 1
+        else
+            audit_file_change "$rule" rm -f -- "$rule" || return 1
+        fi
+        visudo -c || log "CRITICAL: restored sudoers failed validation"
+        return 1
+    fi
+    log "Configured sudo and polkit administrators: root ${ADMIN_USERS[*]}"
+    log "Existing sudoers includes are now inactive; polkit reloads rules automatically"
+    log "Polkit action rules granting access without administrator authentication remain separate; review local YES rules"
+}
+
+configure_admin_access || exit 1
+
+###############################################################################
 # Sysctl hardening (conservative)
 ###############################################################################
 

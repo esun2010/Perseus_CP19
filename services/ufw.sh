@@ -4,8 +4,9 @@ export LC_ALL=C
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../service_helpers/service_common.sh"
 service_init
-load_critical_services "$REPO_DIR/critical_services.txt"
+load_critical_services "$REPO_DIR/input/critical_services.txt"
 install_packages ufw iproute2
+secure_service_permissions ufw
 rules=("${EXTRA_PORTS[@]}")
 # Keep an existing SSH daemon reachable, even if it is not marked critical.
 if critical_service ssh || systemctl is-active --quiet ssh || systemctl is-active --quiet ssh.socket; then
@@ -55,4 +56,5 @@ ufw --force enable
 systemctl enable --now ufw
 systemctl is-enabled --quiet ufw
 ufw status | grep -q '^Status: active$'
+secure_service_permissions ufw
 log "UFW after: $(ufw status verbose)"

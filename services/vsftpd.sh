@@ -31,7 +31,7 @@ else
     log 'Scenario override: plaintext FTP enabled (VSFTPD_TLS_REQUIRED=NO)'
 fi
 audit_file_change "$config" set_config_values "$config" "${settings[@]}"
-audit_chmod 600 "$config"
+secure_service_permissions vsftpd
 # vsftpd has no syntax-check-only flag; check startup and restore on failure.
 if ! enable_service vsftpd; then
     restore_config "$config" "$backup"

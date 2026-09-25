@@ -6,14 +6,14 @@ set -euo pipefail
 # ============================================================
 # Admin Password Reset Script
 #
-# Reads admin usernames from ../user_management/auth_admins.txt and sets each
+# Reads admin usernames from ../input/auth_admins.txt and sets each
 # listed account to the same password.
 #
 # Run with sudo/root.
 # ============================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-AUTH_ADMINS_FILE="$SCRIPT_DIR/../user_management/auth_admins.txt"
+AUTH_ADMINS_FILE="$SCRIPT_DIR/../input/auth_admins.txt"
 
 # Change this password to whatever you want:
 NEW_PASSWORD="ChangeMe123!"

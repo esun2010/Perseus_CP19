@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO_DIR/logging.sh"
+source "$REPO_DIR/service_helpers/permissions.sh"
 source "$REPO_DIR/service_helpers/critical_services.sh"
 
 service_init() {

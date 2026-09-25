@@ -6,10 +6,10 @@ if (($#)); then
 fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/service_helpers/critical_services.sh"
-load_critical_services "$SCRIPT_DIR/critical_services.txt" || exit 1
+load_critical_services "$SCRIPT_DIR/input/critical_services.txt" || exit 1
 
-# General tasks first, required services next, firewall last.
-ORDER=(ker log pol usr adm mp3 pkg cra per ssh apache2 vsftpd ufw)
+# Collect malware indicators before cleanup; required services next, firewall last.
+ORDER=(mal ker log pol usr adm mp3 pkg per ssh apache2 vsftpd ufw)
 declare -A SCRIPT_MAP=(
     [ker]=misc/kernel.sh 
     [log]=misc/login.sh
@@ -18,7 +18,7 @@ declare -A SCRIPT_MAP=(
     [adm]=password_management/reset_admin_pwd.sh
     [mp3]=rm_stuff/rm_mp3+.sh 
     [pkg]=rm_stuff/bad_pkg.sh
-    [cra]=rm_stuff/pwd_cracking_search.sh 
+    [mal]=rm_stuff/malware_search.sh
     [per]=misc/file_permissions.sh
     [ssh]=services/ssh.sh 
     [apache2]=services/apache2.sh
@@ -33,7 +33,7 @@ declare -A DESCRIPTION=(
     [adm]='Reset administrator passwords' 
     [mp3]='Remove MP3/MOV/MP4 files'
     [pkg]='Review and remove packages' 
-    [cra]='Search for password crackers'
+    [mal]='Scan malware, cracking tools, cron and backdoors'
     [per]='File permissions' 
     [ssh]='Install/configure SSH'
     [apache2]='Install/configure Apache' 
@@ -92,6 +92,7 @@ if ((${#INPUT[@]} == 0)); then
     done
 fi
 for key in "${INPUT[@]}"; do
+    [[ "$key" != cra ]] || key=mal # Backward-compatible selection alias.
     case "$key" in
         all)
             for item in "${ORDER[@]}"; do
@@ -106,7 +107,7 @@ done
 for key in ssh apache2 vsftpd ufw; do
     if [[ -n "${SELECTED[$key]:-}" ]]; then
         if ! critical_service "$key"; then
-            echo "Skipping ${SCRIPT_MAP[$key]}: not listed in critical_services.txt."
+            echo "Skipping ${SCRIPT_MAP[$key]}: not listed in input/critical_services.txt."
             unset 'SELECTED[$key]'
         elif critical_service ufw; then
             SELECTED[ufw]=1
@@ -134,6 +135,34 @@ if ((${#SCRIPTS[@]} == 0)); then echo 'No eligible scripts selected.'; exit 0; f
 cd "$SCRIPT_DIR" || exit 1
 source "$SCRIPT_DIR/logging.sh"
 init_logging
+# Refresh package metadata before upgrading; stop if either command fails.
+log "RUN sudo apt update"
+if sudo apt update; then
+    log "PASS sudo apt update"
+else
+    status=$?
+    log "FAILED sudo apt update (exit $status)"
+    exit "$status"
+fi
+log "RUN sudo apt upgrade"
+if sudo apt upgrade; then
+    log "PASS sudo apt upgrade"
+else
+    status=$?
+    log "FAILED sudo apt upgrade (exit $status)"
+    exit "$status"
+fi
+# Install only standard inspection utilities; never install suspect tools.
+if [[ -n "${SELECTED[mal]:-}" ]]; then
+    unset 'COMPLETED[mal]'
+    TASK_STATUS[mal]=not_run
+    save_status || { echo "Cannot save task status to $STATE_FILE" >&2; exit 1; }
+    log 'Ensuring malware scan dependencies: procps iproute2 file findutils grep sed coreutils'
+    if ! apt-get install -y procps iproute2 file findutils grep sed coreutils; then
+        log 'FAILED installing malware scan dependencies'
+        exit 1
+    fi
+fi
 declare -A RESULTS=()
 FAILED=0
 service_failed=0
