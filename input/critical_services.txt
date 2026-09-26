@@ -1,25 +1,30 @@
-#Unlisted members of this set are automatically
-# stopped/disabled at boot, with their packages retained on EVERY valid launcher run.
-# CMS setup uses only explicitly critical web/database services; no implicit installs.
-# List only one of postfix/sendmail. Use web_apps.txt for custom CMS paths.
-# Required services from the competition README, one per line.
-# Remove 'none' and uncomment the services your scenario requires.
-# Supported: ssh (sshd), apache2 (http/httpd), vsftpd (vsftp/ftp), ufw.
-# UFW is also skipped unless listed. Uncomment ufw to enable firewall setup.
-# Other services: allow PORT/tcp or allow START:END/udp, e.g. allow 3306/tcp
+# Critical services from the competition README.
+# Remove the leading # from a service line to mark it critical.
+# Add # back to stop treating it as critical.
+# Managed services not marked critical are disabled; packages/files are retained.
+# mysql covers MySQL or MariaDB; samba covers SMB.
+# Choose only ONE mail server: postfix OR sendmail.
+# WordPress/Joomla setup also requires a critical Apache or Nginx service.
+# Custom CMS directories go in web_apps.txt.
 
-
-# postfix
-# sendmail
-# wordpress
-# joomla
-# openvpn
-# Bind9
-# mysql
-# samba(smb)
 # ssh
 # apache2
 # nginx
 # vsftpd
+# bind9
+# mysql
+# postfix
+# sendmail
+# samba
+# wordpress
+# joomla
+# openvpn
 ufw
 
+# If NO services are critical, comment every service above and uncomment none.
+# none
+
+# Optional firewall rules: uncomment and adjust the port as needed.
+# run sudo ss -lntup to see if services need ports
+# allow 8443/tcp
+# allow 40000:40100/udp

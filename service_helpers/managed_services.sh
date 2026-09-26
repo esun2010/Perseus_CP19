@@ -133,6 +133,8 @@ managed_main() {
     (($# == 0)) || { echo 'This script accepts no arguments.' >&2; return 1; }
     service_init
     load_critical_services "$REPO_DIR/input/critical_services.txt" || return 1
+    source "$REPO_DIR/service_helpers/suspicious_services.sh"
+    audit_suspicious_services || return 1
     reconcile_managed_services || return 1
     [[ "$key" != reconcile ]] || return 0
     if ! critical_service "$key"; then log "DISABLED unlisted $key"; return 0; fi
