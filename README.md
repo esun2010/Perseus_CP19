@@ -1,16 +1,9 @@
 # Description
 This is a set of scripts to run for CyberPatriot Linux
 
-TO-DO:
-1. make all config file management input changes into a big log file
-2. review scenario-specific settings before running scripts
-3. Review malware scan findings against the scenario requirements.
-
 changes admin password to ChangeMe123!
 
-
-
-AI COMMENTS GO DOWN HERE(do not edit or change anything above):
+ALL NEW COMMENTS GO DOWN HERE(do not edit or change anything above):
 
 Service setup requires Debian/Ubuntu (including compatible Mint versions),
 `apt-get`, and a running systemd system. Run scripts with `sudo bash`.
