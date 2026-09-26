@@ -3,3 +3,7 @@
 .run_all_status
 .run_all_status.*
 /test
+
+# Generated second-pass review and action logs
+/log/*(2).txt
+/all_logs(2).txt

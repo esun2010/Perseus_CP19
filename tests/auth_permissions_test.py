@@ -112,6 +112,13 @@ fi
     def assert_mode(self, path, expected):
         self.assertEqual(self.path(path).stat().st_mode & 0o7777, expected, path)
 
+    def test_public_account_files_recover_from_overly_strict_permissions(self):
+        names=['/etc/passwd','/etc/group'] + (['/etc/pwd.db'] if BSD else [])
+        for name in names: self.path(name).chmod(0o600)
+        result=self.run_permissions()
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        for name in names: self.assert_mode(name,0o644)
+
     def test_all_native_paths_protected_and_repeat_run_preserves_stricter_modes(self):
         result = self.run_permissions(REPEAT='yes')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

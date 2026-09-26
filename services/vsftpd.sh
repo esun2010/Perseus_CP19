@@ -36,7 +36,7 @@ secure_service_permissions vsftpd
 # vsftpd has no syntax-check-only flag; check startup and restore on failure.
 if ! enable_service vsftpd; then
     restore_config "$config" "$backup"
-    systemctl restart vsftpd || true
+    refresh_service vsftpd || log "PENDING: restored configuration could not be reloaded"
     log 'FAILED starting vsftpd; previous configuration restored'
     exit 1
 fi

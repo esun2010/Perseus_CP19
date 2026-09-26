@@ -35,7 +35,7 @@ not listed as critical. Failed tasks and tasks blocked by a failed service stay
 `.run_all_status` file. A rerun clears its previous success before starting, so
 failure or interruption leaves it retryable. Remove `.run_all_status` to reset
 all progress for a new scenario.
-`all` includes account/password changes, package removal, and media deletion;
+`all` includes account/password changes, package removal, and a media inventory;
 their existing prompts remain. Selecting an eligible service also selects UFW
 if UFW is critical. Selecting critical UFW also sets up all listed
 services so their actual ports can be discovered. When resuming, already
@@ -68,7 +68,7 @@ scripts may also affect service accounts and files; review the scenario first.
 The launcher, service scripts, `misc` scripts and media-removal script append to
 the root `all_logs.txt`, regardless of the working directory. Configuration
 edits include old/new lines; service state, backups, permissions, firewall
-status and failures are logged. SSH/Apache validate before restarting and restore
+status and failures are logged. SSH/Apache validate before reloading and restore
 their configurations on failure. vsftpd has no validation-only mode, so failed
 startup triggers restoration. Backups are retained in private directories under `/var/backups/cyberpatriot`.
 
@@ -103,11 +103,11 @@ Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
 | File | Description |
 | --- | --- |
 | `misc/kernel.sh` | Applies persistent and runtime sysctl hardening for networking and kernel protections. It also adjusts `/tmp` and `/dev/shm` permissions and mount options, including their existing fstab entries. |
-| `misc/login.sh` | Attempts to lock and delete the guest account, sets LightDM's `allow-guest=false`, and restarts LightDM. SSH configuration is handled separately by `services/ssh.sh`. |
+| `misc/login.sh` | Locks the optional guest account and disables its shell. Configures guest protection only if LightDM is installed, without restarting the active desktop. SSH policy remains in `services/ssh.sh`. |
 | `misc/file_permissions.sh` | Sets permissions on selected system files, directories, and user home directories. It also generates a report of world-writable files and directories. |
 | `password_management/pwd_policy.sh` | Sets password-aging defaults in `/etc/login.defs` and a minimum password length of 12 in `/etc/security/pwquality.conf`. It installs libpam-pwquality if needed and enables the packaged PAM profile without forcing replacement of custom PAM stacks. |
 | `password_management/reset_admin_pwd.sh` | Reads `auth_admins.txt` and resets each existing listed account to the script's `NEW_PASSWORD` value, currently `ChangeMe123!`. Edit that value before running if a different password is required. |
-| `rm_stuff/rm_mp3+.sh` | Deletes MP3, MOV, and MP4 files beneath `/`, excluding `/proc`, `/sys`, `/dev`, and `/run`. Each successful deletion or deletion failure is recorded in the shared log. |
+| `rm_stuff/rm_mp3+.sh` | Writes a read-only MP3/MOV/MP4 inventory to `log/media_files(2).txt`; reviewed removal is performed by `rm_stuff/rm_mp3+_2.sh` in the second launcher. |
 | `rm_stuff/bad_pkg.sh` | Presents a list of potentially unwanted packages for optional editing and asks for confirmation before purging installed matches. After removal, it runs package autoremove. |
 | `rm_stuff/malware_search.sh` | Scans cracking/remote-access tools and packages, cron/at jobs, startup persistence, processes, listeners, and writable temporary locations. All output and errors go to `log/malware_search.txt`; findings are not removed or executed. |
 
@@ -115,11 +115,11 @@ Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
 
 | File | Description |
 | --- | --- |
-| `user_management/user_management.sh` | Opens the authorized-user lists in nano, then audits local accounts with UID 1000 or higher and a usable login shell. It reports unauthorized users and sudo/wheel administrators without deleting accounts or changing group membership. |
+| `user_management/user_management.sh` | Reads the authorized-user lists, audits interactive local accounts at every UID, flags extra UID-zero identities, and writes second-pass review reports without changing accounts. |
 | `input/auth_users.txt` | Input list of authorized local usernames, one per line, based on the competition README. Blank lines and lines beginning with `#` are ignored. |
 | `input/auth_admins.txt` | Input list of authorized administrator usernames, one per line. Both the user audit and administrator password-reset script read this file. |
-| `log/unauth_users.txt` | Output list of audited users absent from `auth_users.txt`. The user audit overwrites this file each time it runs. |
-| `log/unauth_admins.txt` | Output list of audited sudo/wheel members absent from `auth_admins.txt`, excluding accounts already reported as unauthorized users. The user audit overwrites this file each time it runs. |
+| `log/unauth_users(2).txt` | Output list of audited users absent from `auth_users.txt`. The user audit overwrites this file each time it runs. |
+| `log/unauth_admins(2).txt` | Output list of audited sudo/wheel members absent from `auth_admins.txt`, excluding accounts already reported as unauthorized users. The user audit overwrites this file each time it runs. |
 
 ### Service scripts
 
@@ -306,7 +306,7 @@ them. Resolve unusual linked configuration layouts before rerunning.
 To recover a single file, locate its backup in `all_logs.txt`, inspect the
 snapshot, then use `sudo cp -p /var/backups/cyberpatriot/<snapshot>/files/etc/<file> /etc/<file>`
 (or run `cp -p` from a root shell). Validate the restored configuration before
-restarting its service. An `ABSENT` manifest entry means the file did not exist
+reloading its service. An `ABSENT` manifest entry means the file did not exist
 before the operation. Restore related account databases together from the same
 snapshot while account changes are stopped; do not copy a whole `/etc` tree over
 a running system. A configuration snapshot does not roll back installed packages.
@@ -342,3 +342,29 @@ Run the fixture tests instead of executing hardening scripts on a development wo
 `suspicious_services.txt` is a separate, private, timestamped log appended on every service-policy run, before services are disabled (including launcher resume). It reports installed packages and discovered services from a review catalog when their family is absent from `input/critical_services.txt`. For example, installed or running Apache is reported when `apache2` is not critical. Entries distinguish installed packages from runtime and boot state; disabled services are still listed for review. These findings indicate unnecessary exposure to investigate, not confirmed malware.
 
 The catalog includes the managed web, database, mail, file-sharing and VPN services, plus SSH, other FTP servers, Telnet/rsh/TFTP, NFS/rpcbind, SNMP, Avahi, printing, Redis, MongoDB, PostgreSQL, Tor, RDP/VNC, proxies, rsync, inetd/xinetd and container runtimes. The scan only logs findings; it does not expand the automatic disabling policy. Custom service names and unpackaged applications need manual review. Inventory errors are logged as incomplete and stop the service-policy run. Run `bash misc/suspicious_services.sh` as root for the audit alone.
+
+### First-pass review and second-pass cleanup
+
+Populate `input/auth_users.txt` and `input/auth_admins.txt` first. At least one existing non-root administrator is required; administrator entries also count as authorized users. In `run_all.sh`, select `usr mp3` to generate the account and media inventories. These two first-pass tasks only report; they do not delete users or media. Other first-launcher tasks retain their existing behavior.
+
+Review `log/unauth_users(2).txt`, `log/unauth_admins(2).txt`, and `log/media_files(2).txt`. Remove whole candidate lines for accounts/files that must be retained, or correct the allowlists and rerun the audit. The account reports contain usernames and their numeric UIDs; the media report contains an identity signature, a tab, and the absolute path. Do not edit those identity fields.
+
+Then run `sudo bash run_all_2.sh` on Ubuntu, or `bash run_all_2.sh` from a FreeBSD root shell. This explicit second launcher deletes reviewed unauthorized local accounts (retaining home directories), revokes reviewed administrator memberships and local sudo/doas access, restricts installed polkit administrator identities, and removes the reviewed media files after backing them up. It does not rerun upgrades or general hardening. User deletion is not forced: active sessions, UID-zero aliases, the invoking sudo/doas account, identity changes, or failed backups stop or fail cleanup for review. Revoked users must log out of existing sessions; existing root shells and custom polkit action grants require separate review.
+
+Second-pass actions are appended to `log/user_management(2).txt`, `log/media_cleanup(2).txt`, and the combined `all_logs(2).txt`. Both cleanup scripts can also be run separately. Current allowlists are checked again, so newly authorized users are preserved. Missing or changed media is not blindly deleted. Root and system service accounts are not automatically treated as unauthorized ordinary users.
+
+The media inventory covers MP3, MOV and MP4 under `/`, including separate local `/home` partitions. It excludes backups, remote/pseudo-filesystems, and conventional `/media` and `/mnt` mount trees. Use `MEDIA_ROOT=/home bash rm_stuff/rm_mp3+.sh` as root to narrow the inventory; each inventory replaces the previous media review file. Files with embedded newlines/carriage returns are logged for manual review instead of automatic removal.
+
+### Audit corrections
+
+Public account databases (`passwd`, `group`, and FreeBSD `pwd.db`) are restored to `0644` when too restrictive; password-hash files retain their separate private permission policy. The account audit includes low-UID interactive accounts and extra UID-zero identities. Ubuntu skips absent LightDM, uses seat-scoped guest settings without restarting the desktop, queries exact installed-package status, propagates failed kernel changes, and supports `/etc/openvpn/client/*.conf` with template unmasking. FreeBSD already uses native package queries, optional LightDM and verified kernel changes. Run the fixture suites before native-host testing.
+
+### Refresh-only service changes
+
+Service configuration changes request reloads only. There is no automatic restart
+or reboot fallback, including after configuration rollback. Inactive services are
+left inactive; unsupported or failed reloads are logged as pending/failed and return
+an error instead of claiming the new configuration is active. Critical services
+remain enabled at boot. Noncritical services are still stopped and disabled.
+Package installers may run their own service hooks; this policy covers explicit
+service actions in these scripts, not arbitrary third-party package hooks.

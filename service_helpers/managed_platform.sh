@@ -82,7 +82,12 @@ install_managed_package() {
 
 managed_enable() {
     backup_system_paths /etc/systemd/system || return 1
-    systemctl unmask "$1" || return 1
+    local unit="$1" template
+    if [[ "$unit" == *@* ]]; then
+        template="${unit%%@*}@.service"
+        systemctl unmask "$template" || return 1
+    fi
+    systemctl unmask "$unit" || return 1
     enable_service "$1"
 }
 
@@ -146,18 +151,19 @@ configure_native_service() {
         openvpn)
             # A working VPN needs scenario-specific PKI, routes and peer settings.
             # Never invent keys or replace an existing VPN profile with a template.
-            for config in /etc/openvpn/server/*.conf /etc/openvpn/*.conf; do
+            for config in /etc/openvpn/server/*.conf /etc/openvpn/client/*.conf /etc/openvpn/*.conf; do
                 [[ -f "$config" ]] || continue
                 require_regular_config "$config" || return 1
                 profile=${config##*/}; profile=${profile%.conf}
                 [[ "$profile" =~ ^[A-Za-z0-9_-]+$ ]] || { log "FAILED invalid OpenVPN profile name: $profile"; return 1; }
                 secure_path "$config" 600 || return 1
                 if [[ "$config" == /etc/openvpn/server/* ]]; then unit="openvpn-server@$profile"
+                elif [[ "$config" == /etc/openvpn/client/* ]]; then unit="openvpn-client@$profile"
                 else unit="openvpn@$profile"; fi
                 managed_enable "$unit" || return 1
                 found=1
             done
-            ((found)) || { log 'FAILED: OpenVPN requires an existing configured profile in /etc/openvpn/server or /etc/openvpn'; return 1; } ;;
+            ((found)) || { log 'FAILED: OpenVPN requires an existing configured profile in /etc/openvpn/server, /etc/openvpn/client, or /etc/openvpn'; return 1; } ;;
     esac
 }
 

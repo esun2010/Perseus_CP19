@@ -55,6 +55,8 @@ secure_account_permissions() {
     if getent group shadow >/dev/null; then shadow_group=shadow; fi
     for path in /etc/passwd /etc/group /etc/passwd- /etc/group-; do
         secure_path "$path" 644 root root || return 1
+        # These public databases must remain readable for user/group lookup.
+        [[ ! -f "$path" ]] || audit_chmod 644 "$path" || return 1
     done
     for path in /etc/shadow /etc/gshadow /etc/shadow- /etc/gshadow-; do
         secure_path "$path" 640 root "$shadow_group" || return 1

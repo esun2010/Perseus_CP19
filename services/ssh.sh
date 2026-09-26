@@ -29,7 +29,7 @@ if ! /usr/sbin/sshd -t; then
 fi
 if ! enable_service ssh; then
     restore_config "$config" "$backup"
-    systemctl restart ssh || true
+    refresh_service ssh || log "PENDING: restored configuration could not be reloaded"
     log 'FAILED starting SSH; previous configuration restored'
     exit 1
 fi

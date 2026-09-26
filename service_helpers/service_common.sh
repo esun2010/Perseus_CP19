@@ -24,7 +24,7 @@ enable_service() {
     local unit="$1"
     backup_system_paths /etc/systemd/system || return 1
     systemctl enable "$unit" || return 1
-    systemctl restart "$unit" || return 1
+    refresh_service "$unit" || return 1
     systemctl is-enabled --quiet "$unit" || return 1
     systemctl is-active --quiet "$unit" || return 1
     log "VERIFIED $unit active and enabled at boot"
@@ -52,4 +52,15 @@ set_config_values() {
         sed -i "/^[[:space:]]*${key}[[:space:]]*=/d" "$file" || return 1
         printf '%s=%s\n' "$key" "$value" >> "$file" || return 1
     done
+}
+
+# Never fall back to restarting or starting an inactive daemon.
+refresh_service() {
+    local unit="$1"
+    systemctl is-active --quiet "$unit" || { log "PENDING: $unit is inactive; configuration not applied to a running daemon"; return 1; }
+    [[ $(systemctl show --property=CanReload --value "$unit") == yes ]] || {
+        log "PENDING: $unit does not support configuration reload"; return 1;
+    }
+    systemctl reload "$unit" || { log "FAILED: configuration reload for $unit"; return 1; }
+    systemctl is-active --quiet "$unit" || return 1
 }

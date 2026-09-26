@@ -37,7 +37,7 @@ if ! apache2ctl configtest; then
 fi
 if ! enable_service apache2; then
     rollback_apache
-    systemctl restart apache2 || true
+    refresh_service apache2 || log "PENDING: restored configuration could not be reloaded"
     log 'FAILED starting Apache; previous configuration restored'
     exit 1
 fi

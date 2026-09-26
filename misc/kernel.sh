@@ -45,15 +45,14 @@ add_sysctl_setting() {
     ensure_sysctl_file || return 1
     audit_file_change "$SYSCTL_FILE" write_sysctl_setting "$key" "$value" || return 1
 
-    # Apply immediately, but don't abort on failure
-    local old new
-    old=$(sysctl -n "$key" 2>/dev/null) || old="<unavailable>"
-    if sysctl -w "$key=$value" >/dev/null 2>&1; then
-        new=$(sysctl -n "$key" 2>/dev/null) || new="<unavailable>"
-        [[ "$old" == "$new" ]] || log "CHANGED runtime sysctl: $key: $old -> $new"
-    else
-        log "WARNING: Failed to apply sysctl at runtime: $key"
+    # A failed runtime change must not be reported as completed hardening.
+    local new
+    if ! sysctl -w "$key=$value" >/dev/null 2>&1; then
+        log "FAILED applying runtime sysctl: $key"; return 1
     fi
+    new=$(sysctl -n "$key") || { log "FAILED reading runtime sysctl: $key"; return 1; }
+    [[ "$new" == "$value" ]] || { log "FAILED verifying runtime sysctl: $key (expected $value, got $new)"; return 1; }
+    log "VERIFIED runtime sysctl: $key=$new"
 }
 
 ###############################################################################
@@ -247,17 +246,21 @@ harden_mountpoint() {
     log "Hardening $path..."
 
     if [[ -d "$path" ]]; then
-        audit_chmod 1777 "$path"
+        audit_chmod 1777 "$path" || return 1
     fi
 
     if mountpoint -q "$path"; then
         local old new
         old=$(findmnt -n -o OPTIONS --target "$path") || old="<unavailable>"
         if mount -o remount,noexec,nosuid,nodev "$path" 2>/dev/null; then
-            new=$(findmnt -n -o OPTIONS --target "$path") || new="<unavailable>"
+            new=$(findmnt -n -o OPTIONS --target "$path") || return 1
+            local required
+            for required in noexec nosuid nodev; do
+                [[ ",$new," == *",$required,"* ]] || { log "FAILED verifying $path mount option $required"; return 1; }
+            done
             log "REMOUNTED $path: $old -> $new"
         else
-            log "WARNING: Failed to remount $path with noexec,nosuid,nodev"
+            log "FAILED remounting $path with noexec,nosuid,nodev"; return 1
         fi
     else
         log "NOTE: $path is not a mountpoint; skipping remount."
@@ -312,4 +315,4 @@ harden_fstab_entry /dev/shm || exit 1
 ###############################################################################
 
 log "Hardening script finished. Review $LOG_FILE and test services (SSH, web, DB, etc.)."
-echo "[+] Hardening complete. Reboot recommended after verifying services."
+echo "[+] Hardening complete. Review logs for settings requiring manual attention."

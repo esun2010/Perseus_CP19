@@ -56,7 +56,7 @@ ufw default deny incoming
 ufw default allow outgoing
 ufw logging low
 ufw --force enable
-systemctl enable --now ufw
+systemctl enable ufw
 systemctl is-enabled --quiet ufw
 ufw status | grep -q '^Status: active$'
 secure_service_permissions ufw

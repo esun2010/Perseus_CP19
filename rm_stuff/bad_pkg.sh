@@ -71,6 +71,7 @@ read -r -p "Do you want to edit the list now? (y/n) " edit_choice
 TEMP_LIST=""
 cleanup() {
     [[ -n "$TEMP_LIST" && -f "$TEMP_LIST" ]] && rm -f "$TEMP_LIST"
+    return 0
 }
 trap cleanup EXIT
 
@@ -107,7 +108,8 @@ if [[ "$choice" =~ ^[Yy]$ ]]; then
         [[ -z "$pkg" ]] && continue
         [[ "$pkg" =~ ^[a-z0-9][a-z0-9+.-]*$ ]] || { echo "Invalid package name: $pkg" >&2; exit 1; }
         if protected_package "$pkg"; then echo "Preserved critical package: $pkg"; continue; fi
-        if dpkg -l | grep -q "^ii  $pkg "; then
+        package_status=$(dpkg-query -W -f='${db:Status-Status}' -- "$pkg" 2>/dev/null) || package_status=absent
+        if [[ "$package_status" == installed ]]; then
             echo "Removing: $pkg"
             plan=$(LC_ALL=C apt-get -s purge -- "$pkg")
             while read -r action dependent rest; do
