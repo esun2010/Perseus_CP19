@@ -18,12 +18,14 @@ configure_apache() {
 }
 audit_file_change "$config" configure_apache
 secure_service_permissions apache2
+backup_system_paths /etc/apache2/conf-enabled
 a2enconf zz-cyberpatriot
 log 'ENABLED Apache configuration: zz-cyberpatriot'
 rollback_apache() {
     if [[ "$existed" == yes ]]; then restore_config "$config" "$backup";
     else audit_file_change "$config" rm -f -- "$config"; fi
     if [[ "$was_enabled" == no ]]; then
+        backup_system_paths /etc/apache2/conf-enabled || return 1
         a2disconf zz-cyberpatriot
         log 'DISABLED Apache configuration: zz-cyberpatriot (rollback)'
     fi

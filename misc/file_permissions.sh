@@ -4,7 +4,7 @@
 # ---------------------------------
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OUTPUT_FILE="$SCRIPT_DIR/../log/world_files.txt"
+OUTPUT_FILE="$(cd "$SCRIPT_DIR/.." && pwd)/log/world_files.txt"
 source "$SCRIPT_DIR/../logging.sh"
 source "$SCRIPT_DIR/../service_helpers/permissions.sh"
 
@@ -45,7 +45,7 @@ declare -A FILE_PERMS=(
 
 for FILE in "${!FILE_PERMS[@]}"; do
     if [ -e "$FILE" ]; then
-        audit_chmod "${FILE_PERMS[$FILE]}" "$FILE"
+        audit_chmod "${FILE_PERMS[$FILE]}" "$FILE" || exit 1
     fi
 done
 
@@ -64,7 +64,7 @@ declare -A DIR_PERMS=(
 
 for DIR in "${!DIR_PERMS[@]}"; do
     if [ -d "$DIR" ]; then
-        audit_chmod "${DIR_PERMS[$DIR]}" "$DIR"
+        audit_chmod "${DIR_PERMS[$DIR]}" "$DIR" || exit 1
     fi
 done
 
@@ -75,7 +75,7 @@ echo "[+] Securing user home directories..."
 if [ -d /home ]; then
     for HOME_DIR in /home/*; do
         if [ -d "$HOME_DIR" ]; then
-            audit_chmod 700 "$HOME_DIR"
+            audit_chmod 700 "$HOME_DIR" || exit 1
         fi
     done
 fi
@@ -117,7 +117,7 @@ find / \
     -print 2>/dev/null >> "$OUTPUT_FILE"
 }
 
-audit_file_change "$OUTPUT_FILE" write_world_report
+audit_file_change "$OUTPUT_FILE" write_world_report || exit 1
 
 echo
 echo "[+] Report saved to:"

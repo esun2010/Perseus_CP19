@@ -3,6 +3,8 @@
 # Lets you manually edit a list of dangerous packages before removing them
 
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../logging.sh"
 
 if [[ $EUID -ne 0 ]]; then
     echo "This script must be run as root."
@@ -90,11 +92,13 @@ if [[ "$choice" =~ ^[Yy]$ ]]; then
         [[ -z "$pkg" ]] && continue
         if dpkg -l | grep -q "^ii  $pkg "; then
             echo "Removing: $pkg"
+            backup_package_configuration
             apt purge -y "$pkg"
         else
             echo "Not installed: $pkg"
         fi
     done
+    backup_package_configuration
     apt autoremove -y
     echo "[+] Package removal complete."
 else

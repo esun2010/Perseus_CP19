@@ -8,6 +8,7 @@ secure_path() {
     [[ -f "$path" || -d "$path" ]] || { log "FAILED unexpected file type: $path"; return 1; }
     current=$(stat -c '%U' -- "$path") || return 1
     if [[ "$current" != "$owner" ]]; then
+        if [[ -f "$path" ]]; then backup_system_paths "$path" || return 1; fi
         chown -- "$owner" "$path" || return 1
         log "CHANGED owner: $path: $current -> $owner (group retained)"
     fi

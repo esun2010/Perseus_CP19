@@ -14,6 +14,7 @@ service_init() {
 
 install_packages() {
     log "Installing required packages: $*"
+    backup_package_configuration || return 1
     apt-get update
     DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
     log "VERIFIED installed packages: $*"
@@ -21,6 +22,7 @@ install_packages() {
 
 enable_service() {
     local unit="$1"
+    backup_system_paths /etc/systemd/system || return 1
     systemctl enable "$unit" || return 1
     systemctl restart "$unit" || return 1
     systemctl is-enabled --quiet "$unit" || return 1
@@ -30,14 +32,15 @@ enable_service() {
 
 backup_config() {
     local file="$1"
-    CONFIG_BACKUP=$(mktemp "${file}.cp-backup.XXXXXX")
-    cp -p -- "$file" "$CONFIG_BACKUP"
-    log "BACKUP $file -> $CONFIG_BACKUP"
+    CONFIG_BACKUP=
+    [[ -f "$file" && ! -L "$file" ]] || { log "FAILED expected regular configuration file: $file"; return 1; }
+    backup_system_paths "$file" || return 1
+    CONFIG_BACKUP="$SYSTEM_BACKUP_DIR/files$file"
 }
 
 restore_config() {
     local file="$1" backup="$2"
-    audit_file_change "$file" cp -p -- "$backup" "$file"
+    audit_file_change "$file" cp -p -- "$backup" "$file" || return 1
     log "RESTORED $file from $backup"
 }
 

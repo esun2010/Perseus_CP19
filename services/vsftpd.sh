@@ -19,6 +19,7 @@ if [[ "$tls_required" == YES ]]; then
     cert=/etc/ssl/certs/cyberpatriot-vsftpd.pem
     key=/etc/ssl/private/cyberpatriot-vsftpd.key
     if [[ ! -s "$cert" || ! -s "$key" ]]; then
+        backup_system_paths "$key" "$cert"
         (umask 077; openssl req -x509 -nodes -newkey rsa:3072 -days 365 \
             -subj '/CN=vsftpd' -keyout "$key" -out "$cert")
         log "CREATED self-signed FTPS certificate: $cert and private key: $key"

@@ -27,20 +27,8 @@ ensure_sysctl_file() {
         log "CREATED directory: /etc/sysctl.d"
     fi
     if [[ ! -f "$SYSCTL_FILE" ]]; then
-        touch "$SYSCTL_FILE" || { log "FAILED creating $SYSCTL_FILE"; return 1; }
+        audit_file_change "$SYSCTL_FILE" touch "$SYSCTL_FILE" || { log "FAILED creating $SYSCTL_FILE"; return 1; }
         log "Created $SYSCTL_FILE"
-    fi
-}
-
-backup_once() {
-    local file="$1"
-    local marker="$file.cp_hardened_backup_done"
-    if [[ -f "$file" && ! -f "$marker" ]]; then
-        local backup="${file}.bak.$(date +%s)"
-        cp "$file" "$backup" || { log "FAILED backing up $file"; return 1; }
-        log "Backup created: $backup"
-        touch "$marker" || { log "FAILED creating $marker"; return 1; }
-        log "CREATED backup marker: $marker"
     fi
 }
 
@@ -55,7 +43,6 @@ add_sysctl_setting() {
     local value="$2"
 
     ensure_sysctl_file || return 1
-    backup_once "$SYSCTL_FILE" || return 1
     audit_file_change "$SYSCTL_FILE" write_sysctl_setting "$key" "$value" || return 1
 
     # Apply immediately, but don't abort on failure
@@ -216,20 +203,20 @@ configure_admin_access || exit 1
 log "Applying sysctl hardening..."
 
 # IPv4 network hardening
-add_sysctl_setting net.ipv4.tcp_syncookies 1
-add_sysctl_setting net.ipv4.conf.all.rp_filter 1
-add_sysctl_setting net.ipv4.conf.default.rp_filter 1
-add_sysctl_setting net.ipv4.conf.all.accept_redirects 0
-add_sysctl_setting net.ipv4.conf.default.accept_redirects 0
-add_sysctl_setting net.ipv4.conf.all.accept_source_route 0
-add_sysctl_setting net.ipv4.conf.default.accept_source_route 0
-add_sysctl_setting net.ipv4.conf.all.log_martians 1
-add_sysctl_setting net.ipv4.conf.default.log_martians 1
-add_sysctl_setting net.ipv4.icmp_echo_ignore_broadcasts 1
-add_sysctl_setting net.ipv4.icmp_ignore_bogus_error_responses 1
-add_sysctl_setting net.ipv4.tcp_rfc1337 1
-add_sysctl_setting net.ipv4.conf.all.send_redirects 0
-add_sysctl_setting net.ipv4.conf.default.send_redirects 0
+add_sysctl_setting net.ipv4.tcp_syncookies 1 || exit 1
+add_sysctl_setting net.ipv4.conf.all.rp_filter 1 || exit 1
+add_sysctl_setting net.ipv4.conf.default.rp_filter 1 || exit 1
+add_sysctl_setting net.ipv4.conf.all.accept_redirects 0 || exit 1
+add_sysctl_setting net.ipv4.conf.default.accept_redirects 0 || exit 1
+add_sysctl_setting net.ipv4.conf.all.accept_source_route 0 || exit 1
+add_sysctl_setting net.ipv4.conf.default.accept_source_route 0 || exit 1
+add_sysctl_setting net.ipv4.conf.all.log_martians 1 || exit 1
+add_sysctl_setting net.ipv4.conf.default.log_martians 1 || exit 1
+add_sysctl_setting net.ipv4.icmp_echo_ignore_broadcasts 1 || exit 1
+add_sysctl_setting net.ipv4.icmp_ignore_bogus_error_responses 1 || exit 1
+add_sysctl_setting net.ipv4.tcp_rfc1337 1 || exit 1
+add_sysctl_setting net.ipv4.conf.all.send_redirects 0 || exit 1
+add_sysctl_setting net.ipv4.conf.default.send_redirects 0 || exit 1
 
 # NOTE: ip_forward can be scenario-dependent (routing/VPN/NAT).
 # For CyberPatriot, it's safer to NOT force it unless you know it's not needed.
@@ -237,15 +224,15 @@ add_sysctl_setting net.ipv4.conf.default.send_redirects 0
 # add_sysctl_setting net.ipv4.ip_forward 0
 
 # IPv6 – light hardening, do NOT disable IPv6
-add_sysctl_setting net.ipv6.conf.all.accept_redirects 0
-add_sysctl_setting net.ipv6.conf.default.accept_redirects 0
+add_sysctl_setting net.ipv6.conf.all.accept_redirects 0 || exit 1
+add_sysctl_setting net.ipv6.conf.default.accept_redirects 0 || exit 1
 
 # Kernel info leak / memory protections
-add_sysctl_setting kernel.kptr_restrict 1
-add_sysctl_setting kernel.randomize_va_space 2
-add_sysctl_setting kernel.dmesg_restrict 1
-add_sysctl_setting kernel.yama.ptrace_scope 1
-add_sysctl_setting fs.suid_dumpable 0
+add_sysctl_setting kernel.kptr_restrict 1 || exit 1
+add_sysctl_setting kernel.randomize_va_space 2 || exit 1
+add_sysctl_setting kernel.dmesg_restrict 1 || exit 1
+add_sysctl_setting kernel.yama.ptrace_scope 1 || exit 1
+add_sysctl_setting fs.suid_dumpable 0 || exit 1
 
 log "Sysctl hardening complete."
 
@@ -307,8 +294,6 @@ harden_fstab_entry() {
     local path="$1"
     local fstab="/etc/fstab"
 
-    backup_once "$fstab" || return 1
-
     if grep -qE "^[^#].*\s${path//\//\\/}\s" "$fstab"; then
         audit_file_change "$fstab" write_fstab_entry "$path" "$fstab"
     else
@@ -316,11 +301,11 @@ harden_fstab_entry() {
     fi
 }
 
-harden_mountpoint /tmp "/tmp"
-harden_fstab_entry /tmp
+harden_mountpoint /tmp "/tmp" || exit 1
+harden_fstab_entry /tmp || exit 1
 
-harden_mountpoint /dev/shm "/dev/shm"
-harden_fstab_entry /dev/shm
+harden_mountpoint /dev/shm "/dev/shm" || exit 1
+harden_fstab_entry /dev/shm || exit 1
 
 ###############################################################################
 # Final log

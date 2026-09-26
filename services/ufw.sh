@@ -43,6 +43,7 @@ fi
 for rule in "${rules[@]}"; do
     valid_port_rule "$rule" || { log "FAILED invalid firewall port: $rule"; exit 1; }
 done
+backup_system_paths /etc/ufw /etc/default/ufw /etc/systemd/system
 log "UFW before: $(ufw status verbose)"
 # Place required allows ahead of deny rules. Preserve other scenario rules.
 for rule in "${rules[@]}"; do

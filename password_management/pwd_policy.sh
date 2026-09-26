@@ -22,6 +22,7 @@ log "Password/PAM configuration backup: $backup"
 # Preserve custom stacks: never pass --force to pam-auth-update.
 if ! dpkg-query -W -f='${Status}' libpam-pwquality 2>/dev/null | grep -qx 'install ok installed'; then
     apt-get update
+    backup_package_configuration
     apt-get install -y libpam-pwquality
 fi
 [[ -f /usr/share/pam-configs/pwquality ]] || { log 'FAILED: packaged pwquality PAM profile is missing'; exit 1; }
@@ -42,6 +43,7 @@ configure_pwquality() {
     done
 }
 audit_file_change /etc/security/pwquality.conf configure_pwquality
+backup_system_paths /etc/pam.d /var/lib/pam
 if ! pam-auth-update --enable pwquality; then
     log "FAILED enabling password-quality profile; review PAM and restore from $backup if needed"
     exit 1

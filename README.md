@@ -70,13 +70,12 @@ the root `all_logs.txt`, regardless of the working directory. Configuration
 edits include old/new lines; service state, backups, permissions, firewall
 status and failures are logged. SSH/Apache validate before restarting and restore
 their configurations on failure. vsftpd has no validation-only mode, so failed
-startup triggers restoration. Backups are stored next to the changed files.
+startup triggers restoration. Backups are retained in private directories under `/var/backups/cyberpatriot`.
 
 Safe checks (temporary fixtures and mocked commands; no system hardening):
 
 ```bash
-bash tests/logging_test.sh
-bash tests/services_test.sh
+bash tests/backups_test.sh
 ```
 
 Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
@@ -259,3 +258,44 @@ and cron jobs can match, and this heuristic scan cannot prove a system clean.
 
 Run `python3 tests/test_malware_search.py` for isolated scanner and launcher
 checks without installing packages, scanning the host, or running hardening.
+
+## Backups before system changes
+
+Before each configuration edit or regular-file ownership/permission change,
+the scripts save the current file under
+`/var/backups/cyberpatriot/<UTC timestamp>.<unique suffix>/`. Each snapshot has
+private `0700` parent directories, retains original contents, ownership and
+permissions, and is kept after success or failure. Repeated runs create fresh
+snapshots; an old backup never suppresses a new one. Directory-only permission
+changes are logged without recursively copying the directory.
+
+The same protection covers native password/account commands and package hooks.
+Package installation, upgrades and removal first snapshot `/etc`.
+UFW rules/defaults, PAM-generated stacks, Apache configuration enablement,
+systemd enablement and replaced FTPS keys/certificates are also backed up.
+Backups of secrets are kept out of the audit log; only their location is logged.
+Existing configuration diffs are still logged for ordinary text-policy edits.
+
+If creating or copying a backup fails, the corresponding change is not run.
+The snapshot's `files/` directory mirrors the original absolute paths;
+`manifest.txt` lists saved paths and paths that were absent before creation.
+Only snapshots with a `COMPLETE` marker finished copying successfully. Backups
+are not automatically deleted. Symbolic-link targets passed directly for editing
+are refused; links inside a directory snapshot are preserved without following
+them. Resolve unusual linked configuration layouts before rerunning.
+
+To recover a single file, locate its backup in `all_logs.txt`, inspect the
+snapshot, then use `sudo cp -p /var/backups/cyberpatriot/<snapshot>/files/etc/<file> /etc/<file>`
+(or run `cp -p` from a root shell). Validate the restored configuration before
+restarting its service. An `ABSENT` manifest entry means the file did not exist
+before the operation. Restore related account databases together from the same
+snapshot while account changes are stopped; do not copy a whole `/etc` tree over
+a running system. A configuration snapshot does not roll back installed packages.
+
+`CP_BACKUP_ROOT` can select another private absolute backup directory. Safe
+regression checks use a temporary directory and never harden the host:
+
+```bash
+bash tests/backups_test.sh
+python3 tests/backup_commands_test.py
+```

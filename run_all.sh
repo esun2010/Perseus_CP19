@@ -144,6 +144,7 @@ else
     log "FAILED sudo apt update (exit $status)"
     exit "$status"
 fi
+backup_package_configuration || exit 1
 log "RUN sudo apt upgrade"
 if sudo apt upgrade; then
     log "PASS sudo apt upgrade"
@@ -158,6 +159,7 @@ if [[ -n "${SELECTED[mal]:-}" ]]; then
     TASK_STATUS[mal]=not_run
     save_status || { echo "Cannot save task status to $STATE_FILE" >&2; exit 1; }
     log 'Ensuring malware scan dependencies: procps iproute2 file findutils grep sed coreutils'
+    backup_package_configuration || exit 1
     if ! apt-get install -y procps iproute2 file findutils grep sed coreutils; then
         log 'FAILED installing malware scan dependencies'
         exit 1

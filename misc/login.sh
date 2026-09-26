@@ -21,11 +21,13 @@ echo "Starting the process..."
 echo "Disabling the guest account..."
 if id guest &>/dev/null; then
     guest_status=$(passwd -S guest | awk '{print $2}')
+    backup_account_databases
     if usermod -L guest 2>/dev/null; then
         [[ "$guest_status" == L ]] || log "CHANGED guest password status: $guest_status -> L (locked)"
     else
         log "FAILED locking guest account"
     fi
+    backup_account_databases
     if userdel guest 2>/dev/null; then
         log "DELETED account: guest"
     else

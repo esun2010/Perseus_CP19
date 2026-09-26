@@ -13,6 +13,7 @@ set -euo pipefail
 # ============================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../logging.sh"
 AUTH_ADMINS_FILE="$SCRIPT_DIR/../input/auth_admins.txt"
 
 # Change this password to whatever you want:
@@ -33,6 +34,8 @@ if [[ -z "$NEW_PASSWORD" ]]; then
   exit 1
 fi
 
+init_logging
+
 echo "Resetting passwords for admins listed in $AUTH_ADMINS_FILE ..."
 echo
 
@@ -43,6 +46,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
   [[ "$username" =~ ^# ]] && continue
 
   if id "$username" >/dev/null 2>&1; then
+    backup_account_databases
     echo "$username:$NEW_PASSWORD" | chpasswd
     echo "Password updated for: $username"
   else
