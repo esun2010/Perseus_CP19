@@ -43,23 +43,6 @@ managed_units() {
     printf '%s\n%s\n' "$files" "$active" | awk '{print $1}' | sort -u
 }
 
-check_removal_plan() {
-    ((${#REMOVE_PACKAGES[@]})) || return 0
-    local plan action package rest family
-    plan=$(LC_ALL=C apt-get -s purge -- "${REMOVE_PACKAGES[@]}") || return 1
-    while read -r action package rest; do
-        case "$action" in
-            Inst) log "FAILED: removal would install $package; resolve the package dependency first"; return 1 ;;
-            Remv|Purg)
-                package=${package%%:*}
-                family=$(package_family "$package") || {
-                    log "FAILED: removal would affect unrelated package $package"; return 1;
-                }
-                if critical_service "$family"; then log "FAILED: removal would affect critical $family"; return 1; fi ;;
-        esac
-    done <<< "$plan"
-}
-
 disable_managed_unit() {
     local unit="$1"
     backup_system_paths /etc/systemd/system || return 1
@@ -70,15 +53,10 @@ disable_managed_unit() {
     fi
     systemctl mask "$unit" || return 1
     if systemctl is-active --quiet "$unit"; then log "FAILED stopping $unit"; return 1; fi
-    log "DISABLED and masked unlisted service: $unit"
-}
-
-remove_server_packages() {
-    ((${#REMOVE_PACKAGES[@]})) || return 0
-    backup_package_configuration || return 1
-    # The simulation rejects removals outside the unlisted managed families.
-    # Do not autoremove, force dependency breakage, or delete database/mail data.
-    DEBIAN_FRONTEND=noninteractive apt-get purge -y -- "${REMOVE_PACKAGES[@]}" || return 1
+    [[ "$(systemctl is-enabled "$unit" 2>/dev/null)" == masked ]] || {
+        log "FAILED: $unit is not persistently masked"; return 1;
+    }
+    log "DISABLED and persistently masked unlisted service: $unit"
 }
 
 install_managed_package() {
@@ -185,7 +163,6 @@ configure_native_service() {
 
 cms_owner() { stat -c '%U' "$1"; }
 cms_group() { stat -c '%G' "$1"; }
-remove_site_tree() { rm -rf --one-file-system -- "$1"; }
 
 # Actual listeners, including nonstandard ports. Never open loopback databases.
 native_managed_listeners() {

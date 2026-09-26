@@ -1,5 +1,8 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -uo pipefail
+# Repair command lookup before invoking any external command.
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/sbin:/usr/local/bin
+hash -r
 if (($#)); then
     echo 'This launcher only supports interactive selection. Run: sudo bash run_all.sh' >&2
     exit 1
@@ -36,7 +39,7 @@ declare -A SCRIPT_MAP=(
     [ufw]=services/ufw.sh
 )
 declare -A DESCRIPTION=(
-    [svc]='Disable/remove unlisted managed services (always runs)'
+    [svc]='Disable unlisted managed services (always runs)'
     [bind9]='Configure BIND DNS'
     [mysql]='Configure existing MySQL/MariaDB or install MariaDB'
     [postfix]='Configure Postfix'
@@ -164,7 +167,10 @@ if ((${#SCRIPTS[@]} == 0)); then echo 'No eligible scripts selected.'; exit 0; f
 cd "$SCRIPT_DIR" || exit 1
 source "$SCRIPT_DIR/logging.sh"
 init_logging
-# Do not proceed with other changes if automatic removal could not complete.
+# Initial repairs always precede service policy, upgrades and selected tasks.
+source "$SCRIPT_DIR/service_helpers/startup_repair.sh"
+startup_repair || { log "FAILED initial system repairs; tasks stopped"; exit 1; }
+# Do not proceed with other changes if service disabling could not complete.
 unset 'COMPLETED[svc]'
 TASK_STATUS[svc]=not_run
 save_status || exit 1

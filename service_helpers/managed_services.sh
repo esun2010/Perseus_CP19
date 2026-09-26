@@ -45,54 +45,63 @@ discover_sites() {
             add_site "$app" "$path" || return 1
         done < "$REPO_DIR/input/web_apps.txt"
     fi
-    # Never remove a parent tree containing another, critical application.
+    # Never disable a parent tree containing another, critical application.
     for line in "${SITES[@]}"; do
         app=${line%% *}; path=${line#* }
         critical_service "$app" && continue
         for other in "${SITES[@]}"; do
             otherapp=${other%% *}; otherpath=${other#* }
             if critical_service "$otherapp" && [[ "$otherpath" == "$path" || "$otherpath" == "$path/"* ]]; then
-                log "FAILED: removal of $path overlaps critical $otherpath"; return 1
+                log "FAILED: disabling $path overlaps critical $otherpath"; return 1
             fi
         done
     done
 }
 
+# CMS applications have no independent boot service. Deny traversal of their
+# document roots, saving the original mode for restoration when made critical.
+set_site_enabled() {
+    local path="$1" enabled="$2" state="/var/lib/cyberpatriot/disabled-sites$1.mode" mode
+    [[ ! -L "$state" ]] || return 1
+    if [[ "$enabled" == yes ]]; then
+        [[ -f "$state" ]] || return 0
+        read -r mode < "$state"
+        [[ "$mode" =~ ^[0-7]{1,4}$ ]] || return 1
+        backup_system_paths "$path" "$state" || return 1
+        chmod "$mode" "$path" || return 1
+        rm -- "$state" || return 1
+        log "RESTORED critical site access: $path"
+    else
+        if [[ -f "$state" ]]; then
+            if [[ "$MANAGED_PLATFORM" == linux ]]; then mode=$(stat -c '%a' "$path")
+            else mode=$(stat -f '%Lp' "$path"); fi
+            [[ "$mode" != 0 ]] || return 0
+            backup_system_paths "$path" || return 1
+            chmod 000 "$path"; return $?
+        fi
+        if [[ "$MANAGED_PLATFORM" == linux ]]; then mode=$(stat -c '%a' "$path")
+        else mode=$(stat -f '%Lp' "$path"); fi
+        backup_system_paths "$path" "$state" || return 1
+        (umask 077; mkdir -p "${state%/*}" && printf '%s\n' "$mode" > "$state") || return 1
+        chmod 000 "$path" || return 1
+        log "DISABLED site access, retained all files: $path"
+    fi
+}
+
 reconcile_managed_services() {
-    local listing package family units unit site app path
-    REMOVE_PACKAGES=()
-    listing=$(installed_server_packages) || return 1
+    local family units unit site app path
     units=$(managed_units) || return 1
-    while IFS= read -r package; do
-        family=$(package_family "${package%%:*}") || continue
-        critical_service "$family" || REMOVE_PACKAGES+=("$package")
-    done <<< "$listing"
     discover_sites || return 1
-    check_removal_plan || return 1
-    # Finish all site backups before stopping or removing anything.
-    for site in "${SITES[@]}"; do
-        app=${site%% *}; path=${site#* }
-        critical_service "$app" || backup_system_paths "$path" || return 1
-    done
     while IFS= read -r unit; do
         family=$(unit_family "$unit") || continue
         critical_service "$family" || disable_managed_unit "$unit" || return 1
     done <<< "$units"
-    remove_server_packages || return 1
     for site in "${SITES[@]}"; do
         app=${site%% *}; path=${site#* }
-        if ! critical_service "$app" && [[ -d "$path" ]]; then
-            remove_site_tree "$path" || return 1
-            [[ ! -e "$path" ]] || { log "FAILED: site remains at $path"; return 1; }
-            log "REMOVED unlisted $app site: $path (database retained)"
-        fi
+        if critical_service "$app"; then set_site_enabled "$path" yes || return 1
+        else set_site_enabled "$path" no || return 1; fi
     done
-    listing=$(installed_server_packages) || return 1
-    while IFS= read -r package; do
-        family=$(package_family "${package%%:*}") || continue
-        if ! critical_service "$family"; then log "FAILED: unlisted package remains: $package"; return 1; fi
-    done <<< "$listing"
-    log 'VERIFIED managed service removal policy'
+    log 'VERIFIED unlisted services disabled; packages and site files retained'
 }
 
 configure_cms() {
@@ -126,7 +135,7 @@ managed_main() {
     load_critical_services "$REPO_DIR/input/critical_services.txt" || return 1
     reconcile_managed_services || return 1
     [[ "$key" != reconcile ]] || return 0
-    if ! critical_service "$key"; then log "REMOVED/DISABLED unlisted $key"; return 0; fi
+    if ! critical_service "$key"; then log "DISABLED unlisted $key"; return 0; fi
     case "$key" in
         wordpress|joomla) configure_cms "$key" ;;
         *) local status=0; configure_native_service "$key" || status=$?

@@ -2,6 +2,6 @@
 # These are DATA, never shell commands. Paths must not contain whitespace.
 # Standard web roots are also scanned for recognizable existing installations.
 # Listing a path does NOT make it critical: use critical_services.txt for that.
-# An unlisted application's detected roots are backed up and REMOVED.
+# An unlisted application's detected roots are backed up and DISABLED (files are retained).
 # wordpress /srv/sites/example-wordpress
 # joomla /srv/sites/example-joomla
