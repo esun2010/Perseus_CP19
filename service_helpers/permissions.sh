@@ -1,16 +1,24 @@
 #!/usr/bin/env bash
-# Shared permission ceilings: preserve stricter read/execute permissions and groups.
+# Shared permission ceilings: preserve stricter read/execute permissions.
+# Keep existing groups unless a trusted account-database group is specified.
 # Source logging.sh first. Do not traverse symlinks inside a protected tree.
 secure_path() {
-    local path="$1" ceiling="$2" owner="${3:-root}" old new current required=0600
+    local path="$1" ceiling="$2" owner="${3:-root}" group="${4:-}"
+    local old new current current_group ownership required=0600
     [[ ! -L "$path" ]] || { log "SKIPPED symbolic link: $path"; return 0; }
     [[ -e "$path" ]] || { log "SKIPPED absent path: $path"; return 0; }
     [[ -f "$path" || -d "$path" ]] || { log "FAILED unexpected file type: $path"; return 1; }
     current=$(stat -c '%U' -- "$path") || return 1
-    if [[ "$current" != "$owner" ]]; then
+    ownership="$owner"
+    current_group=
+    if [[ -n "$group" ]]; then
+        current_group=$(stat -c '%G' -- "$path") || return 1
+        ownership="$owner:$group"
+    fi
+    if [[ "$current" != "$owner" || "$current_group" != "$group" ]]; then
         if [[ -f "$path" ]]; then backup_system_paths "$path" || return 1; fi
-        chown -- "$owner" "$path" || return 1
-        log "CHANGED owner: $path: $current -> $owner (group retained)"
+        chown -- "$ownership" "$path" || return 1
+        log "CHANGED ownership: $path: $current${current_group:+:$current_group} -> $ownership"
     fi
     old=$(stat -c '%a' -- "$path") || return 1
     # Also remove setuid/setgid/sticky from these config/module paths.
@@ -35,12 +43,33 @@ secure_tree() {
     return "$status"
 }
 
+secure_account_permissions() {
+    local path shadow_group=root
+    # Missing or redirected core databases need repair, never empty replacements.
+    for path in /etc/passwd /etc/group /etc/shadow; do
+        [[ -f "$path" && ! -L "$path" ]] || {
+            log "FAILED expected regular account database: $path"; return 1;
+        }
+    done
+    # Debian/Ubuntu uses the shadow group for privileged password readers.
+    if getent group shadow >/dev/null; then shadow_group=shadow; fi
+    for path in /etc/passwd /etc/group /etc/passwd- /etc/group-; do
+        secure_path "$path" 644 root root || return 1
+    done
+    for path in /etc/shadow /etc/gshadow /etc/shadow- /etc/gshadow-; do
+        secure_path "$path" 640 root "$shadow_group" || return 1
+    done
+}
+
 secure_auth_permissions() {
     local path resolved owner
+    secure_account_permissions || return 1
     secure_tree /etc/pam.d || return 1
-    secure_tree /etc/security || return 1
+    # Restrict password history before the general directory pass, so that pass
+    # can never briefly grant read access to existing password hashes.
     secure_path /etc/security/opasswd 600 || return 1
     secure_path /etc/security/opasswd.old 600 || return 1
+    secure_tree /etc/security || return 1
     # Handle both lib64 layouts and Debian/Ubuntu multiarch module directories.
     for path in /usr/lib64/security /lib64/security /usr/lib/security /lib/security \
                 /usr/lib/*-linux-gnu/security /lib/*-linux-gnu/security; do

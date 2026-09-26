@@ -15,8 +15,8 @@ service_init() {
 install_packages() {
     log "Installing required packages: $*"
     backup_package_configuration || return 1
-    apt-get update
-    DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
+    apt-get update || return 1
+    DEBIAN_FRONTEND=noninteractive apt-get install -y "$@" || return 1
     log "VERIFIED installed packages: $*"
 }
 

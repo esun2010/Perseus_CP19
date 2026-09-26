@@ -203,6 +203,25 @@ key are root-only. UFW configuration is limited to owner/group access while
 retaining execute bits for existing hook scripts. The general file-permissions
 task applies the same profiles, so it no longer weakens SSH permissions.
 
+Both the `per` (file permissions) and `pol` (password policy) tasks apply the
+same account, PAM, and authentication-log protection:
+
+| Requested file or directory | Handling on Ubuntu/Debian/Mint |
+| --- | --- |
+| `/etc/passwd`, `/etc/group` | Root owner and group; at most `0644`. |
+| `/etc/shadow` | Root owner, `shadow` group (root group if unavailable); at most `0640`. `/etc/gshadow` and existing `passwd-`, `group-`, `shadow-`, `gshadow-` copies are protected too. |
+| `/usr/lib64/security` | Protect this module directory when present, plus native multiarch module directories; files at most `0755`, preserving existing execute bits. |
+| `/etc/pam.d` | Root-owned policy files at most `0644`, directories at most `0755`; the password-policy task also enables and verifies password quality. |
+| `/etc/security` | Root-owned configuration at most `0644`; password-history files restricted to `0600` before processing the directory. Password quality is configured in `pwquality.conf`. |
+| `/var/log/secure` | Protect existing files and rotations at most `0640`; also protect Ubuntu's `/var/log/auth.log` and its rotations. |
+
+The three core account databases must be regular files; missing or linked
+databases stop the task without creating empty replacements. Existing account
+records and password hashes are not rewritten by permission hardening. Every
+regular-file ownership or mode change requires a successful backup first.
+The account-group choices follow the usual
+[Ubuntu ownership conventions](https://help.ubuntu.com/community/FilePermissions).
+
 Both file permissions and password management protect `/etc/pam.d`,
 `/etc/security`, and PAM module directories including `/usr/lib64/security`
 and Debian/Ubuntu multiarch equivalents. Configuration files have at most
@@ -226,8 +245,8 @@ logged. Existing account expiration settings and PAM module binaries are not
 rewritten. Module arguments can override configuration-file settings; inspect
 custom overrides. See [pam-auth-update](https://manpages.debian.org/bookworm/libpam-runtime/pam-auth-update.8.en.html).
 
-Run `python3 tests/test_permissions.py` for temporary-file checks of service,
-PAM, module, and log permissions, symlink handling, and repeat runs. These tests
+Run `python3 tests/auth_permissions_test.py` for temporary-file checks of account,
+PAM, module, and log permissions, backups, symlink handling, and repeat runs. These tests
 do not change system ownership, configuration, or running services.
 
 ## Malware indicator scan
@@ -299,3 +318,15 @@ regression checks use a temporary directory and never harden the host:
 bash tests/backups_test.sh
 python3 tests/backup_commands_test.py
 ```
+
+### Managed service policy
+
+Before every launcher run (including resume), `services/reconcile.sh` disables and removes installed BIND9, MySQL/MariaDB, Postfix, Sendmail, Samba, WordPress, Joomla, OpenVPN, and Nginx that are absent from `input/critical_services.txt`. **Review this file against the competition README before running.** An empty file is rejected; `none` explicitly authorizes removal of all these services. Only one mail transport may be critical. Existing SSH, Apache, FTP and firewall selection rules remain separate.
+
+Each service has its own script under `services/`; `mariadb.sh` and `smb.sh` are aliases. Standalone managed scripts also enforce the removal policy. Critical services retain existing settings, receive configuration permission checks, and are enabled using native tools. Existing database engines are preserved. DNS, mail, Samba and Nginx configurations are validated before starting; Postfix disables VRFY. OpenVPN requires an existing profile with scenario-specific certificates and routing. FreeBSD discovers available native package versions and reports unavailable implementations as skipped; base-system Sendmail is disabled rather than deleting system binaries.
+
+WordPress and Joomla are discovered in `/var/www`, `/usr/share/wordpress`, and `/usr/local/www`. Add custom installations to `input/web_apps.txt` as `wordpress /absolute/site/path` or `joomla /absolute/site/path`. Critical CMS setup runs only when Apache or Nginx is explicitly critical; no web or database service becomes critical implicitly. Existing CMS configuration is checked with PHP CLI and its permissions restricted while retaining ownership. Fresh CMS deployment, database credentials, virtual hosts and CMS upgrades remain scenario-specific. If no web server is critical, CMS setup is skipped. When both web servers are critical, existing site routing is preserved.
+
+Unlisted CMS trees are backed up before removal; databases are retained. Shared parent directories and overlap with critical sites cause a failure for manual review. Package dependency checks stop removals that would affect critical or unrelated software; no forced dependency removal or automatic dependency cleanup is used by this policy. Custom daemon unit names and software installed outside the package manager require manual review. Firewall scripts discover public listeners of critical managed daemons, including custom ports; loopback database listeners do not gain firewall rules.
+
+System configuration, service startup settings and removed site trees use the persistent backup mechanism described above. Do not execute these scripts on your workstation to test them. The managed-service fixture tests mock package and service operations.

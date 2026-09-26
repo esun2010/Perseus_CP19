@@ -40,6 +40,8 @@ if critical_service vsftpd; then
     [[ -n "$passive_min" && -n "$passive_max" ]] || { log 'FAILED: configure vsftpd passive ports before enabling UFW'; exit 1; }
     rules+=("$ftp_port/tcp" "$passive_min:$passive_max/tcp")
 fi
+source "$REPO_DIR/service_helpers/managed_firewall.sh"
+append_managed_firewall_rules
 for rule in "${rules[@]}"; do
     valid_port_rule "$rule" || { log "FAILED invalid firewall port: $rule"; exit 1; }
 done

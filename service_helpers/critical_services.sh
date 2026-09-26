@@ -24,6 +24,15 @@ load_critical_services() {
             apache2|apache|http|httpd|https) name=apache2 ;;
             vsftpd|vsftp|ftp) name=vsftpd ;;
             ufw) name=ufw ;;
+            bind9|bind|named) name=bind9 ;;
+            mysql|mysqld|mariadb|mysql-server|mariadb-server) name=mysql ;;
+            postfix) name=postfix ;;
+            sendmail) name=sendmail ;;
+            samba|smb|smbd|samba_server) name=samba ;;
+            wordpress|wp) name=wordpress ;;
+            joomla) name=joomla ;;
+            openvpn) name=openvpn ;;
+            nginx) name=nginx ;;
             none) seen_none=1; continue ;;
             *) echo "Unsupported critical service: $name. Configure it separately and add 'allow PORT/tcp'." >&2; return 1 ;;
         esac
@@ -33,6 +42,16 @@ load_critical_services() {
         echo "Remove 'none' when listing critical services in $file." >&2
         return 1
     fi
+    # An empty/truncated list must never authorize automatic removal.
+    if ((seen_none == 0 && ${#CRITICAL_SERVICES[@]} == 0)); then
+        echo "List required services or explicitly write 'none' in $file." >&2
+        return 1
+    fi
+    if critical_service postfix && critical_service sendmail; then
+        echo 'Choose one MTA: postfix or sendmail, not both on the same host.' >&2
+        return 1
+    fi
+
 }
 
 critical_service() {

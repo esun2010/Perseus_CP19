@@ -9,34 +9,54 @@ source "$SCRIPT_DIR/service_helpers/critical_services.sh"
 load_critical_services "$SCRIPT_DIR/input/critical_services.txt" || exit 1
 
 # Collect malware indicators before cleanup; required services next, firewall last.
-ORDER=(mal ker log pol usr adm mp3 pkg per ssh apache2 vsftpd ufw)
+ORDER=(svc mal ker log pol usr adm mp3 pkg per ssh apache2 vsftpd bind9 mysql postfix sendmail samba nginx openvpn wordpress joomla ufw)
 declare -A SCRIPT_MAP=(
-    [ker]=misc/kernel.sh 
+    [svc]=services/reconcile.sh
+    [bind9]=services/bind9.sh
+    [mysql]=services/mysql.sh
+    [postfix]=services/postfix.sh
+    [sendmail]=services/sendmail.sh
+    [samba]=services/samba.sh
+    [nginx]=services/nginx.sh
+    [openvpn]=services/openvpn.sh
+    [wordpress]=services/wordpress.sh
+    [joomla]=services/joomla.sh
+    [ker]=misc/kernel.sh
     [log]=misc/login.sh
     [pol]=password_management/pwd_policy.sh
     [usr]=user_management/user_management.sh
     [adm]=password_management/reset_admin_pwd.sh
-    [mp3]=rm_stuff/rm_mp3+.sh 
+    [mp3]=rm_stuff/rm_mp3+.sh
     [pkg]=rm_stuff/bad_pkg.sh
     [mal]=rm_stuff/malware_search.sh
     [per]=misc/file_permissions.sh
-    [ssh]=services/ssh.sh 
+    [ssh]=services/ssh.sh
     [apache2]=services/apache2.sh
-    [vsftpd]=services/vsftpd.sh 
+    [vsftpd]=services/vsftpd.sh
     [ufw]=services/ufw.sh
 )
 declare -A DESCRIPTION=(
-    [ker]='Kernel settings' 
+    [svc]='Disable/remove unlisted managed services (always runs)'
+    [bind9]='Configure BIND DNS'
+    [mysql]='Configure existing MySQL/MariaDB or install MariaDB'
+    [postfix]='Configure Postfix'
+    [sendmail]='Configure Sendmail'
+    [samba]='Configure Samba shares/domain service'
+    [nginx]='Configure Nginx'
+    [openvpn]='Configure existing OpenVPN profiles'
+    [wordpress]='Protect existing WordPress installations'
+    [joomla]='Protect existing Joomla installations'
+    [ker]='Kernel settings'
     [log]='Guest login settings'
-    [pol]='Password policy' 
+    [pol]='Password policy'
     [usr]='User/admin management'
-    [adm]='Reset administrator passwords' 
+    [adm]='Reset administrator passwords'
     [mp3]='Remove MP3/MOV/MP4 files'
-    [pkg]='Review and remove packages' 
+    [pkg]='Review and remove packages'
     [mal]='Scan malware, cracking tools, cron and backdoors'
-    [per]='File permissions' 
+    [per]='File permissions'
     [ssh]='Install/configure SSH'
-    [apache2]='Install/configure Apache' 
+    [apache2]='Install/configure Apache'
     [vsftpd]='Install/configure FTP/FTPS'
     [ufw]='Configure firewall for critical services'
 )
@@ -68,7 +88,7 @@ declare -A TASK_STATUS=()
 for key in "${ORDER[@]}"; do
     TASK_STATUS["$key"]=not_run
     [[ -z "${COMPLETED[$key]:-}" ]] || TASK_STATUS["$key"]=ran
-    if [[ "${SCRIPT_MAP[$key]}" == services/* ]] && ! critical_service "$key"; then
+    if [[ "$key" != svc && "${SCRIPT_MAP[$key]}" == services/* ]] && ! critical_service "$key"; then
         TASK_STATUS["$key"]='N/a'
     fi
 done
@@ -93,6 +113,7 @@ if ((${#INPUT[@]} == 0)); then
 fi
 for key in "${INPUT[@]}"; do
     [[ "$key" != cra ]] || key=mal # Backward-compatible selection alias.
+    case "$key" in mariadb) key=mysql ;; smb) key=samba ;; named|bind) key=bind9 ;; wp) key=wordpress ;; esac
     case "$key" in
         all)
             for item in "${ORDER[@]}"; do
@@ -104,7 +125,7 @@ for key in "${INPUT[@]}"; do
     esac
 done
 # Skip every unlisted service, including UFW, even when explicitly selected.
-for key in ssh apache2 vsftpd ufw; do
+for key in ssh apache2 vsftpd bind9 mysql postfix sendmail samba nginx openvpn wordpress joomla ufw; do
     if [[ -n "${SELECTED[$key]:-}" ]]; then
         if ! critical_service "$key"; then
             echo "Skipping ${SCRIPT_MAP[$key]}: not listed in input/critical_services.txt."
@@ -122,6 +143,14 @@ if [[ -n "${SELECTED[ufw]:-}" ]]; then
         fi
     done
 fi
+# CMS task selection also selects the effective web/database dependencies.
+if [[ -n "${SELECTED[wordpress]:-}${SELECTED[joomla]:-}" ]]; then
+    for key in apache2 nginx mysql; do
+        critical_service "$key" && SELECTED["$key"]=1
+    done
+fi
+# Reconcile after validating all user input, even on resume or an empty selection.
+SELECTED[svc]=1
 SCRIPTS=()
 for key in "${ORDER[@]}"; do
     [[ -n "${SELECTED[$key]:-}" ]] || continue
@@ -135,6 +164,18 @@ if ((${#SCRIPTS[@]} == 0)); then echo 'No eligible scripts selected.'; exit 0; f
 cd "$SCRIPT_DIR" || exit 1
 source "$SCRIPT_DIR/logging.sh"
 init_logging
+# Do not proceed with other changes if automatic removal could not complete.
+unset 'COMPLETED[svc]'
+TASK_STATUS[svc]=not_run
+save_status || exit 1
+if ! bash "$SCRIPT_DIR/services/reconcile.sh"; then
+    log 'FAILED service policy; remaining tasks were not run'
+    exit 1
+fi
+COMPLETED[svc]=1
+TASK_STATUS[svc]=ran
+save_status || exit 1
+if ((${#SCRIPTS[@]} == 1)); then log "Service policy complete; no other tasks selected"; exit 0; fi
 # Refresh package metadata before upgrading; stop if either command fails.
 log "RUN sudo apt update"
 if sudo apt update; then
@@ -169,6 +210,7 @@ declare -A RESULTS=()
 FAILED=0
 service_failed=0
 for script in "${SCRIPTS[@]}"; do
+    if [[ "$script" == services/reconcile.sh ]]; then RESULTS["$script"]=PASS; continue; fi
     if [[ "$script" == services/ufw.sh && "$service_failed" == 1 ]]; then
         unset 'COMPLETED[ufw]'
         TASK_STATUS[ufw]=not_run

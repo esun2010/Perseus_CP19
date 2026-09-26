@@ -31,10 +31,6 @@ echo "[+] Configuring important file permissions..."
 
 # Files and their desired permissions
 declare -A FILE_PERMS=(
-    ["/etc/passwd"]="644"
-    ["/etc/shadow"]="640"
-    ["/etc/group"]="644"
-    ["/etc/gshadow"]="640"
     ["/etc/sudoers"]="440"
     ["/etc/ssh/sshd_config"]="600"
     ["/etc/crontab"]="644"

@@ -1,3 +1,8 @@
+# Managed additionally: bind9, mysql (or mariadb), postfix, sendmail, samba (smb),
+# wordpress, joomla, openvpn, nginx. Unlisted members of this set are automatically
+# stopped/disabled and their server packages removed on EVERY valid launcher run.
+# CMS setup uses only explicitly critical web/database services; no implicit installs.
+# List only one of postfix/sendmail. Use web_apps.txt for custom CMS paths.
 # Required services from the competition README, one per line.
 # Remove 'none' and uncomment the services your scenario requires.
 # Supported: ssh (sshd), apache2 (http/httpd), vsftpd (vsftp/ftp), ufw.

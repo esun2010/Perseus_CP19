@@ -25,7 +25,7 @@ class BackupCommandsTest(unittest.TestCase):
         (self.root / 'input/critical_services.txt').write_text('none\n')
         # Only these copied files run. All absolute policy paths point into the fixture.
         for name in ('logging.sh', 'service_helpers/service_common.sh', 'service_helpers/permissions.sh',
-                     'service_helpers/critical_services.sh', 'password_management/reset_admin_pwd.sh', 'misc/login.sh'):
+                     'service_helpers/critical_services.sh', 'service_helpers/managed_firewall.sh', 'service_helpers/managed_platform.sh', 'password_management/reset_admin_pwd.sh', 'misc/login.sh'):
             text = (ROOT / name).read_text().replace('/etc', str(self.root / 'etc'))
             text = text.replace('$EUID -ne 0', '0 -ne 0')
             text = text.replace('[[ -t 0 && -t 1 ]]', 'true')
