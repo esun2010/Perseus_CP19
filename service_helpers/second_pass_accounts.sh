@@ -10,10 +10,10 @@ account_platform_init() {
         *) echo 'Unsupported account platform.' >&2; return 1 ;;
     esac
     [[ $(id -u) == 0 ]] || { echo 'Run as root.' >&2; return 1; }
-    if [[ -f "$SECOND_ROOT/service_helpers/platform.sh" ]]; then
-        source "$SECOND_ROOT/service_helpers/platform.sh"
+    if [[ "$ACCOUNT_PLATFORM" == freebsd ]]; then
+        source "$SECOND_ROOT/platforms/FreeBSD/service_helpers/platform.sh"
         require_freebsd_root || return 1
-    elif [[ "$ACCOUNT_PLATFORM" != linux ]]; then return 1; fi
+    fi
 }
 
 prepare_review_logs() {

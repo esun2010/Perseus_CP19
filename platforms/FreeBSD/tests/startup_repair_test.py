@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from fixture_sources import read_source, SHARED
 ROOT = Path(__file__).resolve().parents[1]
 BSD = 'FreeBSD' in ROOT.name
 
@@ -100,7 +101,7 @@ repair_immutable_files
         self.assertFalse((self.base/'later').exists())
 
     def test_cms_disable_retains_files_and_restores_mode(self):
-        source=(ROOT/'service_helpers/managed_services.sh').read_text()
+        source=read_source('service_helpers/managed_services.sh')
         start=source.index('set_site_enabled() {')
         end=source.index('\nreconcile_managed_services()',start)
         helper=self.base/'site-helper.sh'

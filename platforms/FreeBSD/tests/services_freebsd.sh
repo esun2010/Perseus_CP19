@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Pure helpers and isolated fake PF lifecycle; never changes the host firewall.
 set -euo pipefail
+CP_DISTRO=freebsd
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 TEMP=$(mktemp -d "${TMPDIR:-/tmp}/cyberpatriot-service-tests.XXXXXX")
 trap 'rm -rf "$TEMP"' EXIT
@@ -90,7 +91,7 @@ mkdir -p "$FIXTURE/services" "$FIXTURE/service_helpers" "$FIXTURE/input" "$FIXTU
 sed "s|/etc/|$FIXTURE/etc/|g" "$ROOT/services/pf.sh" > "$FIXTURE/services/pf.sh"
 export TEST_ROOT="$ROOT" PF_FIXTURE="$FIXTURE"
 printf 'pf\nallow 00443/tcp\nallow 40000:40100/tcp\n' > "$FIXTURE/input/critical_services.txt"
-cp "$ROOT/service_helpers/managed_firewall.sh" "$ROOT/service_helpers/managed_platform.sh" "$FIXTURE/service_helpers/"
+cp "$ROOT/../../service_helpers/managed_firewall.sh" "$ROOT/service_helpers/managed_platform.sh" "$FIXTURE/service_helpers/"
 cat > "$FIXTURE/service_helpers/service_common.sh" <<'MOCKS'
 source "$TEST_ROOT/service_helpers/service_common.sh"
 REPO_DIR=$PF_FIXTURE

@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-# Non-daemon Linux components. Source this file; invoke through misc/*.sh.
+# Native implementations live under platforms; policy and callers stay shared.
+if [[ $(uname -s) == FreeBSD ]]; then
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/platforms/FreeBSD/service_helpers/system_components.sh"
+    return $?
+fi
+# Non-daemon Linux components. Source this file; invoke through misc/system_hardening.sh.
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/service_common.sh"
 source "$REPO_DIR/service_helpers/path_hardening.sh"
 
@@ -15,7 +20,6 @@ component_main() {
     local key="$1" file found=0 state listing
     shift
     (($# == 0)) || { echo 'This script accepts no arguments.' >&2; return 1; }
-    service_init
     case "$key" in
         nss)
             component_config /etc/nsswitch.conf || return 1
@@ -95,3 +99,5 @@ component_main() {
         *) log "FAILED: unknown component $key"; return 1 ;;
     esac
 }
+
+component_init() { service_init; }

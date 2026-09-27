@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Native implementations live under platforms; policy and callers stay shared.
+if [[ $(uname -s) == FreeBSD ]]; then
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/platforms/FreeBSD/service_helpers/startup_repair.sh"
+    return $?
+fi
 # Sourced by the launcher only after root checks and logging initialization.
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/distribution.sh"
 repair_immutable_files() {

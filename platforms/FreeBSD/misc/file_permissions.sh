@@ -4,17 +4,22 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../service_helpers/platform.sh"
 require_freebsd_root
-source "$SCRIPT_DIR/../logging.sh"
+source "$SCRIPT_DIR/../../../logging.sh"
 source "$SCRIPT_DIR/../service_helpers/permissions.sh"
+source "$SCRIPT_DIR/../service_helpers/path_hardening.sh"
 init_logging
 require_commands find stat realpath
-OUTPUT_FILE="$(cd "$SCRIPT_DIR/.." && pwd)/log/world_files.txt"
-[[ ! -L "$SCRIPT_DIR/../log" && ! -L "$OUTPUT_FILE" && ! -L "$OUTPUT_FILE.errors" ]] || {
+OUTPUT_FILE="$(cd "$SCRIPT_DIR/../../.." && pwd)/log/world_files.txt"
+[[ ! -L "$SCRIPT_DIR/../../../log" && ! -L "$OUTPUT_FILE" && ! -L "$OUTPUT_FILE.errors" ]] || {
     log 'FAILED: report paths must not be symbolic links'; exit 1;
 }
-mkdir -p "$SCRIPT_DIR/../log"
+mkdir -p "$SCRIPT_DIR/../../../log"
 
 secure_auth_permissions
+secure_local_login_files
+secure_native_startup
+secure_native_trust
+secure_native_boot
 for service_name in sshd apache24 vsftpd pf; do
     secure_service_permissions "$service_name"
 done

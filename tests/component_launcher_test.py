@@ -16,6 +16,7 @@ class ComponentLauncherTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         (self.root / 'service_helpers').mkdir()
         (self.root / 'input').mkdir()
+        (self.root / 'service_helpers/task_paths.sh').write_text((ROOT / 'service_helpers/task_paths.sh').read_text())
         (self.root / 'service_helpers/distribution.sh').write_text(
             'load_distribution() { CP_DISTRO=debian; }\n')
         (self.root / 'service_helpers/critical_services.sh').write_text(
@@ -53,6 +54,14 @@ class ComponentLauncherTests(unittest.TestCase):
         self.assertTrue(selected)
         self.assertFalse(any(p.startswith('services/') for p in selected))
         self.assertIn('misc/kernel.sh', selected)
+
+    def test_system_components_select_one_consolidated_task(self):
+        self.assertEqual(self.launch('run_all.sh', 'sys nss openssl grub selinux iptables dhclient'),
+                         ['misc/system_hardening.sh'])
+        self.assertEqual(self.launch('run_all.sh', 'system_hardening'),
+                         ['misc/system_hardening.sh'])
+        selected = self.launch('run_all.sh', 'all')
+        self.assertEqual(selected.count('misc/system_hardening.sh'), 1)
 
     def test_normal_rejects_service_keywords(self):
         self.launch('run_all.sh', 'ssh', expected=1)

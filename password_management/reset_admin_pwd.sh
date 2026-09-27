@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Use the native implementation when invoked directly on FreeBSD.
+if [[ "${BASH_SOURCE[0]}" == "$0" && $(uname -s) == FreeBSD ]]; then
+    exec bash "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/platforms/FreeBSD/password_management/reset_admin_pwd.sh" "$@"
+fi
 #check
 
 set -euo pipefail

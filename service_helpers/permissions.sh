@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Native implementations live under platforms; policy and callers stay shared.
+if [[ $(uname -s) == FreeBSD ]]; then
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/platforms/FreeBSD/service_helpers/permissions.sh"
+    return $?
+fi
 # Shared permission ceilings: preserve stricter read/execute permissions.
 # Keep existing groups unless a trusted account-database group is specified.
 # Source logging.sh first. Do not traverse symlinks inside a protected tree.

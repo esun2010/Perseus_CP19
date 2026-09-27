@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+CP_DISTRO=freebsd
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-source "$ROOT/service_helpers/managed_services.sh"
+uname() { echo FreeBSD; }
+source "$ROOT/../../service_helpers/managed_services.sh"
+unset -f uname
 TEMP=$(mktemp -d)
 trap 'rm -rf "$TEMP"' EXIT
 log() { :; }
@@ -49,7 +52,7 @@ else
     grep -q '^mysql_enable=NO$' "$TEMP/native"
     grep -q '^-e$' "$TEMP/native"
 fi
-source "$ROOT/service_helpers/managed_firewall.sh"
+source "$ROOT/../../service_helpers/managed_firewall.sh"
 native_managed_listeners() { printf 'tcp 8443 nginx\nudp 53 named\ntcp 3306 mariadbd\n'; }
 CRITICAL_SERVICES=(nginx bind9); rules=(); append_managed_firewall_rules
 [[ ${#rules[@]} == 2 ]] || fail firewall

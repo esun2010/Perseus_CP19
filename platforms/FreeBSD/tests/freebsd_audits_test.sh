@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Isolated fixtures and mocked FreeBSD commands; never changes system policy.
 set -euo pipefail
+CP_DISTRO=freebsd
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 work=$(mktemp -d "${TMPDIR:-/tmp}/cyberpatriot-audits-test.XXXXXX")
 trap 'rm -rf -- "$work"' EXIT
@@ -10,7 +11,7 @@ printf 'alice\n' > "$work/input/auth_admins.txt"
 printf 'ssh\napache24\nvsftpd\npf\n' > "$work/input/critical_services.txt"
 
 (
-    source "$ROOT/user_management/user_management.sh"
+    source "$ROOT/../../user_management/user_management.sh"
     SCRIPT_DIR="$work/user_management"
     SECOND_ROOT="$work"
     account_platform_init() { ACCOUNT_PLATFORM=freebsd; }
@@ -40,7 +41,8 @@ diff -u "$work/expected-admins" <(grep -v '^#' "$work/log/unauth_admins(2).txt")
 
 (
     source "$ROOT/rm_stuff/bad_pkg.sh"
-    SCRIPT_DIR="$work/rm_stuff"
+    SCRIPT_DIR="$work/platforms/FreeBSD/rm_stuff"
+    mkdir -p "$SCRIPT_DIR"
     require_freebsd_root() { :; }
     require_commands() { :; }
     init_logging() { :; }
@@ -70,7 +72,7 @@ done
 
 touch "$work/media/first song.mp3" "$work/media/second.mov"
 (
-    source "$ROOT/rm_stuff/rm_mp3+.sh"
+    source "$ROOT/../../rm_stuff/rm_mp3+.sh"
     SECOND_ROOT="$work"
     account_platform_init() { ACCOUNT_PLATFORM=freebsd; }
     media_signature() { command stat -c '%d:%i:%s:%Y:%Z' "$1"; }

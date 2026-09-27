@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Native implementations live under platforms; policy and callers stay shared.
+if [[ $(uname -s) == FreeBSD ]]; then
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/platforms/FreeBSD/service_helpers/service_common.sh"
+    return $?
+fi
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO_DIR/logging.sh"
 source "$REPO_DIR/service_helpers/distribution.sh"

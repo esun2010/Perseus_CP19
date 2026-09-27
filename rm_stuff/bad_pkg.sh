@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Use the native implementation when invoked directly on FreeBSD.
+if [[ "${BASH_SOURCE[0]}" == "$0" && $(uname -s) == FreeBSD ]]; then
+    exec bash "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/platforms/FreeBSD/rm_stuff/bad_pkg.sh" "$@"
+fi
 # CyberPatriot Safe Removal Script
 # Lets you manually edit a list of dangerous packages before removing them
 

@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Use the native implementation when invoked directly on FreeBSD.
+if [[ "${BASH_SOURCE[0]}" == "$0" && $(uname -s) == FreeBSD ]]; then
+    exec bash "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/platforms/FreeBSD/services/ssh.sh" "$@"
+fi
 set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../service_helpers/service_common.sh"

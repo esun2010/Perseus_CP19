@@ -45,4 +45,4 @@ pkg -N >/dev/null 2>&1 || pkg bootstrap -y
 if ! pkg info -e bash >/dev/null 2>&1; then
     pkg install -y bash
 fi
-exec /usr/local/bin/bash "$SCRIPT_DIR/run_all.sh"
+exec /usr/local/bin/bash "$SCRIPT_DIR/../../run_all.sh"

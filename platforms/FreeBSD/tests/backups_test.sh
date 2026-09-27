@@ -15,7 +15,7 @@ mode() {
     else command stat -c '%a' "$1"; fi
 }
 # Exercise the FreeBSD helper on Linux without changing its production stat calls.
-if [[ $(uname -s) != FreeBSD ]] && grep -q "stat -f '%Lp'" "$ROOT/logging.sh"; then
+if [[ $(uname -s) != FreeBSD ]] && grep -q "stat -f '%Lp'" "$ROOT/../../logging.sh"; then
     stat() {
         if [[ "$1" == -f ]]; then
             case "$2" in

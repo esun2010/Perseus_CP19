@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-source "$REPO_DIR/service_helpers/platform.sh"
+FREEBSD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_DIR="$(cd "$FREEBSD_DIR/../.." && pwd)"
+source "$FREEBSD_DIR/service_helpers/platform.sh"
 source "$REPO_DIR/logging.sh"
-source "$REPO_DIR/service_helpers/permissions.sh"
+source "$FREEBSD_DIR/service_helpers/permissions.sh"
 source "$REPO_DIR/service_helpers/critical_services.sh"
 
 service_init() {

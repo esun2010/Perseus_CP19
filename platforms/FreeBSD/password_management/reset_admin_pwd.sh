@@ -4,11 +4,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../service_helpers/platform.sh"
 require_freebsd_root
-source "$SCRIPT_DIR/../logging.sh"
+source "$SCRIPT_DIR/../../../logging.sh"
 init_logging
 require_commands pw passwd
 
-AUTH_ADMINS_FILE="$SCRIPT_DIR/../input/auth_admins.txt"
+AUTH_ADMINS_FILE="$SCRIPT_DIR/../../../input/auth_admins.txt"
 [[ -r "$AUTH_ADMINS_FILE" ]] || { log "FAILED: cannot read $AUTH_ADMINS_FILE"; exit 1; }
 [[ -t 0 && -t 1 ]] || { log 'FAILED: password resets require an interactive terminal'; exit 1; }
 

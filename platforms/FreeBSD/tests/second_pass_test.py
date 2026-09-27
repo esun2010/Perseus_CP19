@@ -5,6 +5,7 @@ import os
 import subprocess
 import tempfile
 import unittest
+from fixture_sources import read_source, SHARED
 ROOT=Path(__file__).resolve().parents[1]
 BSD='FreeBSD' in ROOT.name
 
@@ -15,9 +16,9 @@ class SecondPassTest(unittest.TestCase):
         self.root=Path(self.temp.name)
         for name in ('service_helpers','input','log','etc','media','groups'):
             (self.root/name).mkdir()
-        (self.root/'logging.sh').write_text((ROOT/'logging.sh').read_text())
+        (self.root/'logging.sh').write_text(read_source('logging.sh'))
         for name in ('second_pass_accounts.sh','second_pass_media.sh'):
-            text=(ROOT/'service_helpers'/name).read_text()
+            text=read_source('service_helpers/' + name)
             text=text.replace('/usr/local/etc','@@ETC@@').replace('/etc/sudoers','@@ETC@@/sudoers').replace('/etc/doas.conf','@@ETC@@/doas.conf').replace('@@ETC@@',str(self.root/'etc'))
             text=text.replace('/usr/share/polkit-1/rules.d',str(self.root/'no-polkit')).replace('/usr/local/share/polkit-1/rules.d',str(self.root/'no-polkit'))
             (self.root/'service_helpers'/name).write_text(text)
@@ -142,7 +143,8 @@ fi
         self.assertFalse((self.root/'log/unauth_users(2).txt').exists())
 
     def test_second_launcher_requires_reviews_and_stops_on_task_failure(self):
-        (self.root/'run_all_2.sh').write_text((ROOT/'run_all_2.sh').read_text())
+        (self.root/'service_helpers/distribution.sh').write_text('load_distribution() { CP_DISTRO=freebsd; }\n')
+        (self.root/'run_all_2.sh').write_text(read_source('run_all_2.sh'))
         helper=self.root/'service_helpers/second_pass_accounts.sh'
         with helper.open('a') as f:f.write('\naccount_platform_init() { ACCOUNT_PLATFORM=linux; }\n')
         result=self.run_script('bash "$FIXTURE/run_all_2.sh"')

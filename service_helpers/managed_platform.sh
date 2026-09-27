@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Native implementations live under platforms; policy and callers stay shared.
+if [[ $(uname -s) == FreeBSD ]]; then
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/platforms/FreeBSD/service_helpers/managed_platform.sh"
+    return $?
+fi
 # Ubuntu/Debian operations. Never execute this helper directly.
 MANAGED_PLATFORM=linux
 

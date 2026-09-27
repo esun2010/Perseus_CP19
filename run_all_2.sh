@@ -7,9 +7,6 @@ export LC_ALL=C
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/service_helpers/distribution.sh"
 load_distribution || exit 1
-if [[ "$CP_DISTRO" == freebsd ]]; then
-    exec bash "$SCRIPT_DIR/platforms/FreeBSD/run_all_2.sh" "$@"
-fi
 source "$SCRIPT_DIR/service_helpers/second_pass_accounts.sh"
 account_platform_init
 LOG_FILE="$SCRIPT_DIR/all_logs(2).txt"

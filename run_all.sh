@@ -10,19 +10,11 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/service_helpers/distribution.sh"
 load_distribution || exit 1
-if [[ "$CP_DISTRO" == freebsd ]]; then
-    export RUN_SERVICES=0
-    exec bash "$SCRIPT_DIR/platforms/FreeBSD/run_all.sh" "$@"
-fi
+source "$SCRIPT_DIR/service_helpers/task_paths.sh"
 # Non-service tasks only. Service tasks live in run_all_services.sh.
-ORDER=(mal ker log pol usr adm mp3 pkg per nss openssl grub selinux netfilter dhclient)
+ORDER=(mal ker log pol usr adm mp3 pkg per sys)
 declare -A SCRIPT_MAP=(
-    [nss]=misc/nss.sh
-    [openssl]=misc/openssl.sh
-    [grub]=misc/grub.sh
-    [selinux]=misc/selinux.sh
-    [netfilter]=misc/netfilter.sh
-    [dhclient]=misc/dhclient.sh
+    [sys]=misc/system_hardening.sh
 
     [ker]=misc/kernel.sh
     [log]=misc/login.sh
@@ -35,12 +27,7 @@ declare -A SCRIPT_MAP=(
     [per]=misc/file_permissions.sh
 )
 declare -A DESCRIPTION=(
-    [nss]='Check NSS permissions and account/name lookups'
-    [openssl]='Check OpenSSL and protect private-key permissions'
-    [grub]='Check GRUB syntax and protect boot configuration'
-    [selinux]='Check SELinux enforcement and configuration permissions'
-    [netfilter]='Snapshot Netfilter/iptables rules (UFW applies policy)'
-    [dhclient]='Protect existing DHCP client configuration and hooks'
+    [sys]='Check system components and protect their configuration'
 
     [ker]='Kernel settings'
     [log]='Guest login settings'
@@ -52,8 +39,14 @@ declare -A DESCRIPTION=(
     [mal]='Scan malware, cracking tools, cron and backdoors'
     [per]='File permissions'
 )
+resolve_task_paths
+
 # Store task keywords as data, never as executable shell code.
 STATE_FILE="$SCRIPT_DIR/.run_all_status"
+[[ "$CP_DISTRO" != freebsd ]] || STATE_FILE+=.freebsd
+[[ ! -L "$STATE_FILE" && ( ! -e "$STATE_FILE" || -f "$STATE_FILE" ) ]] || {
+    echo "Refusing unsafe state file: $STATE_FILE" >&2; exit 1;
+}
 declare -A COMPLETED=()
 if [[ -e "$STATE_FILE" ]]; then
     [[ -r "$STATE_FILE" ]] || { echo "Cannot read $STATE_FILE" >&2; exit 1; }
@@ -101,7 +94,7 @@ if ((${#INPUT[@]} == 0)); then
 fi
 for key in "${INPUT[@]}"; do
     [[ "$key" != cra ]] || key=mal # Backward-compatible selection alias.
-    case "$key" in iptables) key=netfilter ;; esac
+    case "$key" in system_hardening|nss|openssl|grub|selinux|netfilter|iptables|dhclient) key=sys ;; esac
     case "$key" in
         auto|all)
             for item in "${ORDER[@]}"; do
@@ -122,12 +115,23 @@ done
 printf 'Selected: %s\n' "${SCRIPTS[@]}"
 if ((${#SCRIPTS[@]} == 0)); then echo 'No eligible scripts selected.'; exit 0; fi
 [[ $(id -u) == 0 ]] || { echo 'Run with sudo: sudo bash run_all.sh' >&2; exit 1; }
+require_launcher_platform || exit 1
 cd "$SCRIPT_DIR" || exit 1
 source "$SCRIPT_DIR/logging.sh"
 init_logging
 # Initial repairs always precede upgrades and selected tasks.
 source "$SCRIPT_DIR/service_helpers/startup_repair.sh"
 startup_repair || { log "FAILED initial system repairs; tasks stopped"; exit 1; }
+if [[ "$CP_DISTRO" == freebsd ]]; then
+    require_commands pkg || exit 1
+    backup_package_configuration || exit 1
+    pkg -N >/dev/null 2>&1 || pkg bootstrap -y || exit 1
+    log 'RUN pkg update'
+    pkg update || exit 1
+    backup_package_configuration || exit 1
+    log 'RUN pkg upgrade'
+    pkg upgrade || exit 1
+else
 # Refresh package metadata before upgrading; stop if either command fails.
 log "RUN sudo apt update"
 if sudo apt update; then
@@ -157,6 +161,7 @@ if [[ -n "${SELECTED[mal]:-}" ]]; then
         log 'FAILED installing malware scan dependencies'
         exit 1
     fi
+fi
 fi
 declare -A RESULTS=()
 FAILED=0

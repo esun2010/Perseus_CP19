@@ -6,6 +6,7 @@ import re
 import subprocess
 import tempfile
 import unittest
+from fixture_sources import read_source, SHARED
 
 ROOT = Path(__file__).resolve().parents[1]
 BSD = (ROOT / 'service_helpers/platform.sh').exists()
@@ -49,7 +50,7 @@ class AuthenticationPermissionsTest(unittest.TestCase):
         if not BSD:
             self.path('/lib64').mkdir()
             self.path('/lib64/security').symlink_to(self.path('/usr/lib64/security'))
-        (self.fixture / 'logging.sh').write_text((ROOT / 'logging.sh').read_text())
+        (self.fixture / 'logging.sh').write_text(read_source('logging.sh'))
         permissions = (ROOT / 'service_helpers/permissions.sh').read_text()
         # Replace only absolute policy roots, retaining the real helper control flow.
         permissions = re.sub(r'(?<![A-Za-z0-9_])/(?:usr|etc|var|lib64|lib)(?=/)',

@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../service_helpers/platform.sh"
 require_freebsd_root
-source "$SCRIPT_DIR/../logging.sh"
+source "$SCRIPT_DIR/../../../logging.sh"
 source "$SCRIPT_DIR/../service_helpers/permissions.sh"
 init_logging
 require_commands cap_mkdb awk install

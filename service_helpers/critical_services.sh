@@ -21,9 +21,9 @@ load_critical_services() {
         [[ -z "$port" ]] || { echo "Use one service per line: $line" >&2; return 1; }
         case "$name" in
             ssh|sshd|openssh|openssh-server) name=ssh ;;
-            apache2|apache|http|httpd|https) name=apache2 ;;
+            apache24|apache2|apache|http|httpd|https) name=apache2 ;;
             vsftpd|vsftp|ftp) name=vsftpd ;;
-            ufw) name=ufw ;;
+            pf|ufw) if [[ "${CP_DISTRO:-$(uname -s)}" == freebsd || $(uname -s) == FreeBSD ]]; then name=pf; else name=ufw; fi ;;
             bind9|bind|named) name=bind9 ;;
             mysql|mysqld|mariadb|mysql-server|mariadb-server) name=mysql ;;
             postfix) name=postfix ;;

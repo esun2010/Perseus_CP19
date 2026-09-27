@@ -1,4 +1,8 @@
 #!/bin/bash
+# Use the native implementation when invoked directly on FreeBSD.
+if [[ "${BASH_SOURCE[0]}" == "$0" && $(uname -s) == FreeBSD ]]; then
+    exec bash "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/platforms/FreeBSD/misc/login.sh" "$@"
+fi
 # Lock the optional guest account and configure the selected display manager.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

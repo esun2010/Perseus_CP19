@@ -4,8 +4,8 @@ set -euo pipefail
 export LC_ALL=C
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../service_helpers/platform.sh"
-source "$SCRIPT_DIR/../service_helpers/critical_services.sh"
-source "$SCRIPT_DIR/../logging.sh"
+source "$SCRIPT_DIR/../../../service_helpers/critical_services.sh"
+source "$SCRIPT_DIR/../../../logging.sh"
 
 source "$SCRIPT_DIR/../service_helpers/managed_platform.sh"
 
@@ -24,7 +24,7 @@ protected_package() {
 main() {
     require_freebsd_root
     require_commands pkg mktemp
-    load_critical_services "$SCRIPT_DIR/../input/critical_services.txt"
+    load_critical_services "$SCRIPT_DIR/../../../input/critical_services.txt"
     init_logging
     # FreeBSD base nc/telnet are not third-party packages and cannot be deleted here.
     local -a candidates=(nmap netcat john hydra medusa ophcrack hashcat wireshark

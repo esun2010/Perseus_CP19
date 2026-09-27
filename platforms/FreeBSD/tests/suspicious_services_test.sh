@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+CP_DISTRO=freebsd
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-source "$ROOT/service_helpers/critical_services.sh"
+source "$ROOT/../../service_helpers/critical_services.sh"
 source "$ROOT/service_helpers/managed_platform.sh"
-source "$ROOT/service_helpers/suspicious_services.sh"
+source "$ROOT/../../service_helpers/suspicious_services.sh"
 TEMP=$(mktemp -d)
 trap 'rm -rf "$TEMP"' EXIT
 REPO_DIR=$TEMP

@@ -8,10 +8,6 @@
 /log/*(2).txt
 /all_logs(2).txt
 
-# Native FreeBSD runtime output (source and templates remain tracked)
-/platforms/FreeBSD/all_logs*.txt
-/platforms/FreeBSD/log/*
-!/platforms/FreeBSD/log/.gitkeep
 **/__pycache__/
 
 # Separate service launcher progress

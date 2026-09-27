@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../service_helpers/platform.sh"
 require_freebsd_root
-source "$SCRIPT_DIR/../logging.sh"
+source "$SCRIPT_DIR/../../../logging.sh"
 init_logging
 require_commands sysctl pw mount awk install
 mkdir -p /var/backups
@@ -12,7 +12,7 @@ backup=$(mktemp -d /var/backups/cyberpatriot-kernel.XXXXXX)
 log "Hardening configuration backups: $backup"
 
 load_admin_allowlist() {
-    local file="$SCRIPT_DIR/../input/auth_admins.txt" line uid
+    local file="$SCRIPT_DIR/../../../input/auth_admins.txt" line uid
     ADMIN_USERS=()
     [[ -r "$file" ]] || { log "FAILED: cannot read $file"; return 1; }
     while IFS= read -r line || [[ -n "$line" ]]; do
@@ -156,6 +156,8 @@ apply_sysctl_setting() {
     [[ "$old" == "$new" ]] || log "CHANGED runtime sysctl: $key: $old -> $new"
     return 0
 }
+source "$SCRIPT_DIR/../service_helpers/kernel_network.sh"
+disable_forwarding || exit 1
 failures=0
 for setting in \
     net.inet.tcp.syncookies=1 \
@@ -166,6 +168,8 @@ for setting in \
     net.inet.icmp.bmcastecho=0 \
     net.inet6.ip6.redirect=0 \
     net.inet6.icmp6.rediraccept=0 \
+    security.bsd.hardlink_check_uid=1 \
+    security.bsd.hardlink_check_gid=1 \
     security.bsd.unprivileged_read_msgbuf=0 \
     security.bsd.unprivileged_proc_debug=0 \
     kern.sugid_coredump=0 \
@@ -175,7 +179,8 @@ for setting in \
     kern.elf64.aslr.pie_enable=1; do
     apply_sysctl_setting "${setting%%=*}" "${setting#*=}" || failures=1
 done
-log 'IPv4/IPv6 forwarding and IPv6 availability were retained'
+log 'IPv4/IPv6 forwarding is disabled; IPv6 host connectivity remains available'
+log 'Linux protected_symlinks, SysRq and rp_filter have no direct portable FreeBSD sysctl equivalents; native firewall policy requires separate review'
 
 write_tmp_fstab() {
     local temporary

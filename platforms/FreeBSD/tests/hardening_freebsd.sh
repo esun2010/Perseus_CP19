@@ -59,7 +59,7 @@ if awk -f "$REPO/password_management/passwd_policy.awk" "$fixture/sufficient" >/
 
 # Load just the pure allowlist parser, not the executable hardening script.
 source <(awk '/^load_admin_allowlist\(\) \{/ { body=1 } body { print } body && /^}/ { exit }' "$REPO/misc/kernel.sh")
-SCRIPT_DIR="$fixture/misc"
+SCRIPT_DIR="$fixture/platforms/FreeBSD/misc"
 mkdir -p "$SCRIPT_DIR" "$fixture/input"
 log() { :; }
 pw() { [[ "$1" == usershow && "$2" == -n && ( "$3" == alice || "$3" == bob.admin || "$3" == root ) ]]; }

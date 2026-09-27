@@ -1,4 +1,4 @@
-# CyberPatriot FreeBSD toolkit
+# FreeBSD implementation for the shared toolkit
 
 This toolkit configures **native FreeBSD hosts and virtual machines**. FreeBSD
 is a separate operating system from Linux. The scripts use FreeBSD `pkg`,
@@ -9,14 +9,22 @@ The normal FreeBSD base-system layout and packages under `/usr/local` are
 required. Bash 4.3 or newer is required; the bootstrap installs the FreeBSD Bash
 package. Neither sudo nor GNU coreutils is required to launch the toolkit.
 
+## Shared project layout
+
+All paths and commands below are relative to the repository root. Clone the
+whole project: this folder is a native backend, not a standalone copy.
+`input/`, `log/`, `all_logs.txt`, all three `run_all*.sh` launchers, account/media
+review, common service policy, and logging are shared with Linux. Changes to
+those root files apply on both platforms. FreeBSD-specific operations stay here.
+
 ## Start on FreeBSD
 
-1. Copy or clone the entire directory onto FreeBSD, retaining LF line endings.
+1. Copy or clone the entire repository onto FreeBSD, retaining LF line endings.
 2. Edit these scenario lists first (one entry per line; comments are allowed):
    - `input/auth_users.txt`: authorized local login names.
    - `input/auth_admins.txt`: existing authorized administrator names.
    - `input/critical_services.txt`: required services and extra firewall ports.
-3. Open a root shell using `su -`, change into this directory, and run:
+3. Open a root shell using `su -`, change into the repository root, and run:
 
    ```sh
    sh bootstrap.sh
@@ -28,6 +36,7 @@ Once Bash is installed, run the launcher or an individual task as root with:
 
 ```sh
 /usr/local/bin/bash run_all.sh
+/usr/local/bin/bash run_all_services.sh
 /usr/local/bin/bash services/ssh.sh
 ```
 
@@ -40,7 +49,7 @@ access available while changing administrator access or firewall rules.
 
 Enter keywords separated by spaces, `all` to rerun every eligible task, or a blank
 line to resume unfinished tasks. Command-line task arguments are not supported.
-Before selected tasks run, the launcher executes `pkg update` and `pkg upgrade`;
+Before general tasks run, `run_all.sh` executes `pkg update` and `pkg upgrade`;
 the upgrade retains its normal confirmation prompt. This is not a FreeBSD release
 upgrade tool; maintain the base system using the method appropriate to your image.
 
@@ -55,6 +64,12 @@ upgrade tool; maintain the base system using the method appropriate to your imag
 | `mp3` | Inventory MP3/MOV/MP4 files for review; only run_all_2.sh deletes reviewed files. |
 | `pkg` | Review installed packages; remove only after typing `REMOVE`. |
 | `per` | Apply native file permissions and report world-writable paths. |
+| `sys` | Run the combined native system-component checks described below. |
+
+Service keywords below belong to `run_all_services.sh`:
+
+| Keyword | Task |
+| --- | --- |
 | `ssh` | Configure and enable base-system `sshd`. |
 | `apache2` or `apache24` | Install/configure the `apache24` package and service. |
 | `vsftpd` | Install/configure `vsftpd-ssl` and the `vsftpd` service. |
@@ -67,7 +82,8 @@ Services run only if listed as critical, even when explicitly selected. Selectin
 a service also selects PF if PF is critical. Selecting PF configures listed
 services first to discover their listener ports. A service failure blocks PF.
 
-Successful tasks are stored in `.run_all_status.freebsd`; Linux progress in
+Successful general tasks are stored in `.run_all_status.freebsd`, and service
+tasks in `.run_all_services_status.freebsd`, at the repository root. Linux progress in
 `.run_all_status` is ignored. The menu shows `ran`, `not_run`, or `N/a` for unlisted
 services. Explicit selections rerun completed tasks. Failed or cancelled tasks
 remain retryable. Delete `.run_all_status.freebsd` to start a new scenario.
@@ -90,7 +106,8 @@ Names are case-insensitive. Aliases include `sshd`, `apache2`, `http`, `httpd`,
 `https`, `vsftp`, `ftp`, and `ufw`. Use `none` when no supported services are
 required, without mixing it with service names. Unknown names and invalid ports
 stop the launcher. Configure other services separately and add their firewall
-ports explicitly. The checked-in list enables only PF; edit it for your scenario.
+ports explicitly. The shared list enables the platform firewall by default; `ufw` selects PF on
+FreeBSD. Edit the list for your scenario.
 
 PF discovers supported live listeners and preserves the current SSH server port
 when `SSH_CONNECTION` is available. It uses deny-incoming/allow-outgoing rules
@@ -118,7 +135,7 @@ IPv4 listener; add a separate IPv6 service configuration when the scenario
 requires it. For a scenario that requires plaintext FTP:
 
 ```sh
-env VSFTPD_TLS_REQUIRED=NO /usr/local/bin/bash run_all.sh
+env VSFTPD_TLS_REQUIRED=NO /usr/local/bin/bash run_all_services.sh
 ```
 
 Filesystem permissions, `/etc/ftpusers`, NAT, and client settings still apply.
@@ -168,7 +185,7 @@ hardening preserves account records and password hashes. File ownership and
 permission changes require backups first. Absent optional paths and logs are
 not fabricated. See the [FreeBSD PAM documentation](https://docs.freebsd.org/en/articles/pam/)
 and [password policy guidance](https://docs.freebsd.org/en/books/handbook/security/).
-Run `python3 tests/auth_permissions_test.py` for isolated coverage, repeat-run,
+Run `python3 platforms/FreeBSD/tests/auth_permissions_test.py` for isolated coverage, repeat-run,
 backup-failure, and symlink checks without changing host authentication.
 
 Permission handling protects `/etc/master.passwd` and `/etc/spwd.db`, uses native
@@ -205,11 +222,11 @@ installed packages or reverse earlier successful tasks.
 Safe checks (temporary fixtures and mocks; no host hardening):
 
 ```sh
-/usr/local/bin/bash tests/regression.sh
-/usr/local/bin/bash tests/services_freebsd.sh
-/usr/local/bin/bash tests/hardening_freebsd.sh
-/usr/local/bin/bash tests/freebsd_audits_test.sh
-/usr/local/bin/bash tests/native_freebsd.sh
+/usr/local/bin/bash platforms/FreeBSD/tests/regression.sh
+/usr/local/bin/bash platforms/FreeBSD/tests/services_freebsd.sh
+/usr/local/bin/bash platforms/FreeBSD/tests/hardening_freebsd.sh
+/usr/local/bin/bash platforms/FreeBSD/tests/freebsd_audits_test.sh
+/usr/local/bin/bash platforms/FreeBSD/tests/native_freebsd.sh
 ```
 
 The native smoke test additionally checks BSD utilities, permission handling,
@@ -264,28 +281,18 @@ a running system. A configuration snapshot does not roll back installed packages
 regression checks use a temporary directory and never harden the host:
 
 ```bash
-bash tests/backups_test.sh
-python3 tests/backup_commands_test.py
+bash platforms/FreeBSD/tests/backups_test.sh
+python3 platforms/FreeBSD/tests/backup_commands_test.py
 ```
 
 ### Managed service policy
 
-Set the `RUN_SERVICES` default near the top of `run_all.sh` to `0`, or run
-`env RUN_SERVICES=0 bash run_all.sh` as root, to skip all `services/` scripts,
-including reconciliation and PF. The default is `1` (enabled). Disabled service
-tasks display `N/a` and retain their saved progress. Other selected tasks,
-initial repairs and package upgrades still run. The policy below applies only
-when `RUN_SERVICES=1`.
-
-Before each launcher run (including resume), unlisted BIND9, MySQL/MariaDB, Postfix, Sendmail, Samba, WordPress, Joomla, OpenVPN and Nginx are **disabled, never automatically uninstalled**. Packages, databases and site files remain in place. Review `input/critical_services.txt` against the competition README first. Empty lists are rejected; `none` explicitly disables all managed services. Ubuntu stops, disables and persistently masks systemd units; FreeBSD stops native services, writes boot flags and checks that services are no longer boot-enabled. Custom service names/startup jobs need manual review.
-
-WordPress/Joomla have no separate daemon. Their discovered document roots are backed up and made inaccessible with mode `000`, which survives reboot and blocks ordinary unprivileged web workers. Original modes are saved privately in `/var/lib/cyberpatriot/disabled-sites` and restored when the application becomes critical again. This assumes normal, unprivileged web workers; custom root-running web applications need manual isolation. Overlap with a critical site's root stops the operation. Usual locations are `/var/www`, `/usr/share/wordpress`, `/usr/local/www`; add custom roots in `input/web_apps.txt`. Existing critical CMS configuration is checked only when Apache or Nginx is explicitly critical. No web/database dependency becomes critical implicitly.
-
-Each managed service has a script under `services/`; `mariadb.sh` and `smb.sh` are aliases. Native settings and database engines are preserved. Configuration checks precede enabling services. OpenVPN needs existing scenario-specific profiles and certificates; CMS deployment, database credentials and virtual hosts remain scenario-specific. FreeBSD uses available native packages or logs an unavailable implementation as skipped. Firewalls use actual critical-service listeners. The separate interactive package-removal task still removes packages you explicitly approve.
+`run_all.sh` runs general tasks only. Use the shared `run_all_services.sh` for
+reconciliation, service configuration, and PF. `RUN_SERVICES` is no longer used.
 
 ### Initial system repairs
 
-`run_all.sh` sets a trusted PATH before its first external command. After validating task selection and root access, it runs `service_helpers/startup_repair.sh` before service reconciliation, upgrades or selected tasks, including on resume. Any failed repair stops subsequent tasks.
+`run_all.sh` sets a trusted PATH before its first external command. After validating task selection and root access, it runs `service_helpers/startup_repair.sh` before upgrades or selected general tasks, including on resume. Any failed repair stops subsequent tasks.
 
 Ubuntu scans `/etc`, `/var/lib/dpkg`, `/var/lib/apt` and `/var/cache/apt` for immutable/append-only flags. It backs up affected paths, records original flags in the backup, then clears the flags. It also repairs the default login PATH in `/etc/environment`, preserving other variables. Individual shell startup files can still override PATH and need manual review. FreeBSD performs the native flag repair in `/etc`, `/usr/local/etc` and `/var/db/pkg`; securelevel restrictions may require single-user repair. Neither implementation clears flags across the whole filesystem.
 
@@ -324,3 +331,67 @@ an error instead of claiming the new configuration is active. Critical services
 remain enabled at boot. Noncritical services are still stopped and disabled.
 Package installers may run their own service hooks; this policy covers explicit
 service actions in these scripts, not arbitrary third-party package hooks.
+
+## Native system-component hardening
+
+Select `sys` in the shared `run_all.sh`, or run `bash misc/system_hardening.sh`.
+The shared runner invokes all components below using the native FreeBSD backend.
+Legacy component keywords also select the entire combined task.
+
+| Component | FreeBSD behavior |
+| --- | --- |
+| `nss` | Protect `/etc/nsswitch.conf`; check root, wheel and localhost lookups with timeouts. Keep configured lookup order. |
+| `openssl` | Protect existing OpenSSL configuration and private-key permissions; check the selected OpenSSL binary's cipher loading and protect native certificate directories. |
+| `grub` | Protect `/boot/loader.conf`, `loader.conf.local`, `loader.rc` and `loader.conf.d`. If GRUB configurations exist, protect and syntax-check them with `grub-script-check`. No bootloader is installed or regenerated. |
+| `selinux` | Report **not applicable**: FreeBSD does not implement Linux SELinux. Native MAC policy is not configured automatically. |
+| `netfilter` | Snapshot already-loaded PF/IPFW rules instead of invoking Linux Netfilter. Keep rules unchanged; `platforms/FreeBSD/services/pf.sh` remains the firewall policy writer. |
+| `dhclient` | Protect existing native `/etc/dhclient.conf`, enter/exit hooks, and corresponding `/usr/local/etc` files. Preserve hook execute bits, leases and interface settings. |
+
+The `ker` task now always disables both `net.inet.ip.forwarding` and
+`net.inet6.ip6.forwarding`, reads them back, and persists zero values in
+`/etc/sysctl.conf`. It also sets `gateway_enable=NO` and
+`ipv6_gateway_enable=NO` in `/etc/rc.conf` and existing standard local/routing
+overrides, then verifies the rc settings. Required forwarding controls failing
+or being unavailable stops the task; they are not silently skipped. This turns
+off packet routing, not IPv4/IPv6 host networking. Rerun `ker` explicitly if it
+was already marked complete. Backups precede configuration changes.
+
+Existing native ASLR, SYN-cookie and redirect/source-route protections remain.
+The task now also applies `security.bsd.hardlink_check_uid=1` and
+`security.bsd.hardlink_check_gid=1` where supported. Linux `protected_symlinks`,
+SysRq and `rp_filter` are not copied as nonexistent FreeBSD sysctls.
+
+The `per` task additionally protects local users' shell startup/history files
+(including native `.cshrc`, `.login`, `.history`) and SSH files, root included.
+It supports the standard `/home` to `/usr/home` alias, refuses other linked
+user paths, and does not log secret contents. Native `rc.d` scripts retain
+execute permissions, certificate trees retain trust membership, and loader
+configuration is protected without changing boot binaries. EFI FAT mount
+permissions still require manual review.
+
+Certificate roots checked: `/usr/share/certs`, `/usr/local/share/certs`,
+`/usr/local/etc/ssl/certs`, `/etc/ssl/certs`, `/etc/ssl/untrusted`. Internal
+certificate symlinks are retained. Missing optional paths are not created.
+The firewall snapshot can include private `pf-status.txt`, `pf-filter.rules`,
+`pf-nat.rules` and `ipfw.rules` files under the standard backup directory.
+
+Fixture validation (no host hardening):
+
+```sh
+python3 platforms/FreeBSD/tests/system_components_test.py
+bash platforms/FreeBSD/tests/regression.sh
+bash platforms/FreeBSD/tests/hardening_freebsd.sh
+```
+
+References: [FreeBSD routing](https://docs.freebsd.org/en/books/handbook/advanced-networking/),
+[DHCP client](https://docs.freebsd.org/en/books/handbook/network-servers/),
+[certificate management](https://man.freebsd.org/cgi/man.cgi?manpath=FreeBSD+12.4-RELEASE&query=certctl).
+
+Configuration edits made by `misc` scripts and their shared helpers append
+setting-level entries to `all_logs.txt`: `changed SETTING from OLD to NEW` or
+`added SETTING with new value VALUE`. Each setting includes its file path and
+INI section where applicable. This covers sysctl and rc settings, LightDM,
+sudoers/polkit policies, and fstab mount options. Removed settings are recorded
+as `changed ... to <unset>`; unchanged values do not produce setting entries.
+Backups and full diffs remain available, including after partial edit failures.
+Run `python3 platforms/FreeBSD/tests/settings_logging_test.py` for isolated logging checks.

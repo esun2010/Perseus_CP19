@@ -7,6 +7,7 @@
 # WordPress/Joomla setup also requires a critical Apache or Nginx service.
 # Custom CMS directories go in web_apps.txt.
 
+# ufw and pf both select the native firewall (UFW on Linux, PF on FreeBSD).
 ufw
 # ssh
 # apache2

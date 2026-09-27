@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from fixture_sources import read_source, SHARED
 
 ROOT = Path(__file__).resolve().parents[1]
 BSD = (ROOT / 'service_helpers/platform.sh').exists()
@@ -26,7 +27,7 @@ class BackupCommandsTest(unittest.TestCase):
         # Only these copied files run. All absolute policy paths point into the fixture.
         for name in ('logging.sh', 'service_helpers/service_common.sh', 'service_helpers/permissions.sh',
                      'service_helpers/critical_services.sh', 'service_helpers/managed_firewall.sh', 'service_helpers/managed_platform.sh', 'password_management/reset_admin_pwd.sh', 'misc/login.sh'):
-            text = (ROOT / name).read_text().replace('/etc', str(self.root / 'etc'))
+            text = read_source(name).replace('/etc', str(self.root / 'etc'))
             text = text.replace('$EUID -ne 0', '0 -ne 0')
             text = text.replace('[[ -t 0 && -t 1 ]]', 'true')
             (self.root / name).write_text(text)
@@ -58,6 +59,7 @@ systemctl() { [[ "$1" != is-active ]]; }
 ''')
         if BSD:
             with (self.root / 'mocks.sh').open('a') as out:
+                out.write("uname() { echo FreeBSD; }\n")
                 out.write("id() { printf '1001\\n'; }\n")
         self.env = dict(os.environ, BASH_ENV=str(self.root / 'mocks.sh'),
                         FIXTURE=str(self.root), CP_BACKUP_ROOT=str(self.root / 'backups'),

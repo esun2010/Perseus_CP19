@@ -1,4 +1,8 @@
 #!/bin/bash
+# Use the native implementation when invoked directly on FreeBSD.
+if [[ "${BASH_SOURCE[0]}" == "$0" && $(uname -s) == FreeBSD ]]; then
+    exec bash "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/platforms/FreeBSD/misc/file_permissions.sh" "$@"
+fi
 
 # Linux Permission Hardening Script
 # ---------------------------------

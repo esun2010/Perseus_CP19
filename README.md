@@ -5,14 +5,12 @@
 The two launchers expose the following tasks. Run the normal launcher for
 non-service components and the service launcher for service configuration.
 Startup repairs belong to the normal launcher; reconciliation belongs to the
-service launcher. These additions target the Linux Debian/Ubuntu/Mint
-scripts, not the separate FreeBSD implementation.
+service launcher. The service additions target Linux Debian/Ubuntu/Mint. Native equivalents of
+the six non-service components and system hardening are also available in
+`platforms/FreeBSD`; see its README for the platform-specific behavior.
 
 | Folder | Tasks / scripts | Behavior |
 | --- | --- | --- |
-| `misc/` | `nss.sh`, `openssl.sh`, `grub.sh`, `selinux.sh` | Protect configuration permissions and check name lookups, OpenSSL cipher loading, GRUB syntax, or SELinux runtime enforcement. |
-| `misc/` | `netfilter.sh` | Save available IPv4/IPv6 iptables and nftables rules in private backups. Existing `services/ufw.sh` remains the firewall policy writer. |
-| `misc/` | `dhclient.sh` | Protect existing ISC DHCP client configuration and hook permissions without renewing leases. DHCP clients often run under a network manager rather than a dedicated service. |
 | `services/` | `sssd.sh`, `dhcpd.sh`, `nfs-server.sh`, `avahi.sh`, `cupsd.sh`, `snmpd.sh` | Check existing scenario-specific services when listed in `input/critical_services.txt`. |
 | `services/extended/` | `fail2ban.sh`, `chrony.sh`, `ntpd.sh`, `rsyslog.sh`, `acpid.sh`, `smartd.sh` | Check installed, active general system/security services without requiring a critical-list entry. Hardware support remains optional on machines that do not use it. |
 | `services/` | Existing `ssh.sh` | OpenSSH server hardening; select `ssh` or its `openssh` alias. |
@@ -20,7 +18,8 @@ scripts, not the separate FreeBSD implementation.
 `run_all.sh` contains only non-service tasks. Service selection lives in
 `run_all_services.sh`, including `services/extended/`. There is no Linux
 `RUN_SERVICES` toggle to turn services back on in the normal launcher.
-Select `netfilter` (alias `iptables`), `nfs` (alias `nfs-server`), `cups` (alias
+Select `sys` for the combined Linux component checks (legacy `netfilter` and
+`iptables` selections also run the combined task), `nfs` (alias `nfs-server`), `cups` (alias
 `cupsd`), `chrony` (aliases `chronyd` and `crony`), or the other listed task names.
 Scripts may also be run individually with `sudo bash path/to/script.sh`.
 
@@ -55,31 +54,38 @@ Validator references: [Chrony `-p`](https://chrony-project.org/doc/4.9/chronyd.h
 and [Netfilter documentation](https://netfilter.org/documentation/).
 
 
-The FreeBSD project is bundled under `platforms/FreeBSD`; this repository now
-contains both implementations. No separate checkout is required.
+Linux and FreeBSD share the top-level launchers, inputs, logs, account/media
+review, service policy, firewall-rule construction, and configuration auditing.
+`platforms/FreeBSD/` contains only native implementations, platform documentation,
+and native tests. Shared code is loaded directly; changes do not need to be
+copied into a second project tree.
 
-Edit `input/distribution.txt`: uncomment exactly one of `ubuntu`, `debian`, `mint`,
-`freebsd`, or leave `auto` selected. The selection must match the running OS.
-Run the top-level `run_all.sh` and `run_all_2.sh` using Bash on either platform.
-On a FreeBSD installation without Bash, run `sh bootstrap.sh` from a root shell;
-it backs up configuration before installing prerequisites.
+Edit `input/distribution.txt`: select exactly one of `ubuntu`, `debian`, `mint`,
+`freebsd`, or `auto`. The selection must match the running OS. On either platform:
 
-| Selected platform | Inputs to review | Logs and second-pass review files |
-| --- | --- | --- |
-| Ubuntu / Debian / Mint | `input/` | `log/` and `all_logs*.txt` |
-| FreeBSD | `platforms/FreeBSD/input/` | `platforms/FreeBSD/log/` and `platforms/FreeBSD/all_logs*.txt` |
+- `bash run_all.sh`: general hardening and inventories (`sys` combines component checks).
+- `bash run_all_services.sh`: service policy and configuration; native firewall last.
+- `bash run_all_2.sh`: apply reviewed account and media cleanup.
 
-The distribution selector is always the top-level `input/distribution.txt` when
-using the shared launchers. Native inputs were copied intact from the FreeBSD
-project, including its PF critical-service setting; review its account allowlists
-before running. Direct scripts under `platforms/FreeBSD` are native entry points
-and perform their own FreeBSD checks. Native services use `pkg`, rc services and
-PF, with reload-only behavior. Linux retains APT, systemd and UFW.
+Run as root. On FreeBSD without Bash, use `sh bootstrap.sh` from the repository
+root; it backs up configuration before installing prerequisites.
 
-See [FreeBSD instructions](platforms/FreeBSD/README.md) for native details. Paths
-in those instructions are relative to `platforms/FreeBSD`. Runtime logs, launcher
-state and Git metadata from the original FreeBSD checkout were not imported.
-The original checkout remains unchanged; future edits to it are not synchronized.
+Both platforms use **`input/`**, **`log/`**, **`all_logs.txt`**, and
+**`all_logs(2).txt`** at the repository root. The shared critical-service list
+accepts `ufw` or `pf` for the platform firewall: UFW on Linux, PF on FreeBSD.
+Review the shared account allowlists and service list before running.
+FreeBSD progress uses `.run_all_status.freebsd` and
+`.run_all_services_status.freebsd`; Linux progress is kept separately.
+
+Native `pkg`, rc, OpenPAM, sysctl, boot, and service configuration code remains in
+`platforms/FreeBSD/`. Identical service entry points and policy helpers live only
+at the root; they load the appropriate native backend. Unsupported FreeBSD
+service selections stop before any changes. Linux-specific extended services
+are not offered on FreeBSD.
+
+See [FreeBSD instructions](platforms/FreeBSD/README.md). All commands there are
+relative to the repository root. The separately checked-out FreeBSD repository
+is independent; this integration applies to the FreeBSD folder in this project.
 
 # Description
 This is a set of scripts to run for CyberPatriot Linux
@@ -105,11 +111,10 @@ sudo bash run_all.sh
 
 The normal launcher accepts interactive non-service keywords, `auto` (all scripts), or Enter to
 resume unfinished tasks. It never selects service scripts or reconciliation,
-even if `RUN_SERVICES=1` is present in the environment. Its FreeBSD dispatch also
-forces service tasks off. Package upgrades and general system hardening remain
+even if `RUN_SERVICES=1` is present in the environment. Package upgrades and general system hardening remain
 part of the normal launcher.
 
-For Linux services, use the separate launcher:
+For services on either platform, use the separate launcher:
 
 ```bash
 sudo bash run_all_services.sh
@@ -137,7 +142,7 @@ is skipped if a preceding service fails. CMS selections include their listed
 web/database dependencies. The service launcher does not run the normal
 launcher's system repairs or blanket package upgrade; individual service scripts
 retain their own package and configuration behavior. It currently targets Linux;
-FreeBSD service management remains in the native FreeBSD launcher.
+The same service launcher selects native FreeBSD implementations and PF when running on FreeBSD.
 
 Progress is stored separately in `.run_all_status` and
 `.run_all_services_status`, both ignored by Git. A rerun clears previous success
@@ -206,6 +211,7 @@ Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
 
 | File | Description |
 | --- | --- |
+| `misc/system_hardening.sh` | Runs NSS, OpenSSL, GRUB, SELinux, Netfilter snapshot, and DHCP client checks together (`sys` in the launcher). |
 | `misc/kernel.sh` | Applies persistent and runtime sysctl hardening for networking and kernel protections. It also adjusts `/tmp` and `/dev/shm` permissions and mount options, including their existing fstab entries. |
 | `misc/login.sh` | Locks the optional guest account and disables its shell. Detects the selected LightDM, GDM or SDDM manager and saves login protection without restarting the active desktop. SSH policy remains in `services/ssh.sh`. |
 | `misc/file_permissions.sh` | Sets permissions on selected system files, directories, and user home directories. It also generates a report of world-writable files and directories. |
@@ -563,8 +569,25 @@ The existing `per` task (`misc/file_permissions.sh`) now also covers:
 | The same homes: `.ssh/authorized_keys`, `.ssh/config`, `.ssh/id_rsa`, `.ssh/id_ed25519` | Owner-only files and `.ssh` directory; no key/history contents logged. Linked paths are reported for review rather than followed. |
 | `/lib/systemd/system/`, `/usr/lib/systemd/system/` | Root ownership and removal of group/other write access for regular units/drop-ins, including sshd, nginx, httpd, rsyslog and auditd when present. Distribution aliases resolve; links inside the trees remain unchanged. Vendor units also join the malware persistence inventory. |
 | `/usr/share/ca-certificates/`, `/etc/pki/tls/certs/`, `/etc/pki/ca-trust/source/anchors/`, `/usr/local/share/ca-certificates/` | Protect existing regular certificate files/directories; trust membership and symlink targets remain unchanged. |
-| `/boot/grub/grub.cfg`, `/boot/grub2/grub.cfg`, `/boot/efi/EFI/{ubuntu,centos,redhat}/grub.cfg`, `/boot/loader/entries/` | Owner-only regular files/directories on POSIX filesystems. FAT EFI filesystems are reported for mount-permission review instead of ineffective chmod. Also included in the `grub` task. |
+| `/boot/grub/grub.cfg`, `/boot/grub2/grub.cfg`, `/boot/efi/EFI/{ubuntu,centos,redhat}/grub.cfg`, `/boot/loader/entries/` | Owner-only regular files/directories on POSIX filesystems. FAT EFI filesystems are reported for mount-permission review instead of ineffective chmod. Also included in the combined `sys` task. |
 
 Absent optional paths are not created. These path checks do not imply CentOS or
 Red Hat launcher support. Certificate trust, SSH key authorization and boot-entry
 contents still require scenario review; no trust store or bootloader is rebuilt.
+
+The shared `sys` task uses native FreeBSD implementations for NSS, OpenSSL,
+boot, MAC applicability, firewall snapshots and DHCP client checks, with persistent IPv4/IPv6 forwarding
+disablement, hardlink protection and sensitive-path hardening. See
+`platforms/FreeBSD/README.md` for native mappings and Linux-only exclusions.
+
+The shared launcher consolidates the former `nss`, `openssl`, `grub`, `selinux`,
+`netfilter`, and `dhclient` tasks into `sys`. Their old selection keywords
+(including `iptables`) select the entire consolidated task. Existing completion
+records for individual components do not skip the new combined task.
+
+Configuration edits append setting-level entries to `all_logs.txt`, in addition
+to the original backups and file diffs: `changed SETTING from OLD to NEW` or
+`added SETTING with new value VALUE`. Entries include the configuration path and,
+for INI files, the section. Removed settings use `changed ... to <unset>`;
+unchanged values do not produce setting entries. Partial edits are recorded even
+if the editing command fails.
