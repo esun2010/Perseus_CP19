@@ -20,7 +20,7 @@ load_critical_services() {
         fi
         [[ -z "$port" ]] || { echo "Use one service per line: $line" >&2; return 1; }
         case "$name" in
-            ssh|sshd|openssh-server) name=ssh ;;
+            ssh|sshd|openssh|openssh-server) name=ssh ;;
             apache2|apache|http|httpd|https) name=apache2 ;;
             vsftpd|vsftp|ftp) name=vsftpd ;;
             ufw) name=ufw ;;
@@ -33,6 +33,15 @@ load_critical_services() {
             joomla) name=joomla ;;
             openvpn) name=openvpn ;;
             nginx) name=nginx ;;
+            sssd|fail2ban|chrony|ntpd|acpid|smartd|rsyslog|dhcpd|snmpd) ;;
+            chronyd|crony) name=chrony ;;
+            ntp|ntpsec) name=ntpd ;;
+            isc-dhcp-server) name=dhcpd ;;
+            nfs|nfs-server|nfs-kernel-server) name=nfs ;;
+            avahi|avahi-daemon) name=avahi ;;
+            cups|cupsd) name=cups ;;
+            snmp) name=snmpd ;;
+            smartmontools) name=smartd ;;
             none) seen_none=1; continue ;;
             *) echo "Unsupported critical service: $name. Configure it separately and add 'allow PORT/tcp'." >&2; return 1 ;;
         esac
@@ -49,6 +58,11 @@ load_critical_services() {
     fi
     if critical_service postfix && critical_service sendmail; then
         echo 'Choose one MTA: postfix or sendmail, not both on the same host.' >&2
+        return 1
+    fi
+
+    if critical_service chrony && critical_service ntpd; then
+        echo 'Choose one time daemon: chrony or ntpd.' >&2
         return 1
     fi
 

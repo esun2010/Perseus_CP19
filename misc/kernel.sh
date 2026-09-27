@@ -201,12 +201,18 @@ configure_admin_access || exit 1
 
 log "Applying sysctl hardening..."
 
+# Forwarding changes reset some IPv4 defaults, so apply them before the rest.
+add_sysctl_setting net.ipv4.ip_forward 0 || exit 1
+add_sysctl_setting net.ipv6.conf.all.forwarding 0 || exit 1
+
 # IPv4 network hardening
 add_sysctl_setting net.ipv4.tcp_syncookies 1 || exit 1
 add_sysctl_setting net.ipv4.conf.all.rp_filter 1 || exit 1
 add_sysctl_setting net.ipv4.conf.default.rp_filter 1 || exit 1
 add_sysctl_setting net.ipv4.conf.all.accept_redirects 0 || exit 1
 add_sysctl_setting net.ipv4.conf.default.accept_redirects 0 || exit 1
+add_sysctl_setting net.ipv4.conf.all.secure_redirects 0 || exit 1
+add_sysctl_setting net.ipv4.conf.default.secure_redirects 0 || exit 1
 add_sysctl_setting net.ipv4.conf.all.accept_source_route 0 || exit 1
 add_sysctl_setting net.ipv4.conf.default.accept_source_route 0 || exit 1
 add_sysctl_setting net.ipv4.conf.all.log_martians 1 || exit 1
@@ -216,11 +222,6 @@ add_sysctl_setting net.ipv4.icmp_ignore_bogus_error_responses 1 || exit 1
 add_sysctl_setting net.ipv4.tcp_rfc1337 1 || exit 1
 add_sysctl_setting net.ipv4.conf.all.send_redirects 0 || exit 1
 add_sysctl_setting net.ipv4.conf.default.send_redirects 0 || exit 1
-
-# NOTE: ip_forward can be scenario-dependent (routing/VPN/NAT).
-# For CyberPatriot, it's safer to NOT force it unless you know it's not needed.
-# Uncomment only if the scenario clearly does NOT require routing:
-# add_sysctl_setting net.ipv4.ip_forward 0
 
 # IPv6 – light hardening, do NOT disable IPv6
 add_sysctl_setting net.ipv6.conf.all.accept_redirects 0 || exit 1
@@ -232,6 +233,9 @@ add_sysctl_setting kernel.randomize_va_space 2 || exit 1
 add_sysctl_setting kernel.dmesg_restrict 1 || exit 1
 add_sysctl_setting kernel.yama.ptrace_scope 1 || exit 1
 add_sysctl_setting fs.suid_dumpable 0 || exit 1
+add_sysctl_setting fs.protected_hardlinks 1 || exit 1
+add_sysctl_setting fs.protected_symlinks 1 || exit 1
+add_sysctl_setting kernel.sysrq 0 || exit 1
 
 log "Sysctl hardening complete."
 

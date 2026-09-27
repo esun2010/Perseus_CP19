@@ -7,6 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_FILE="$(cd "$SCRIPT_DIR/.." && pwd)/log/world_files.txt"
 source "$SCRIPT_DIR/../logging.sh"
 source "$SCRIPT_DIR/../service_helpers/permissions.sh"
+source "$SCRIPT_DIR/../service_helpers/path_hardening.sh"
 
 echo "========================================"
 echo " Linux Permission Hardening"
@@ -23,6 +24,9 @@ fi
 init_logging
 mkdir -p "$SCRIPT_DIR/../log" || exit 1
 secure_auth_permissions || exit 1
+secure_local_login_files || exit 1
+secure_vendor_units_and_trust || exit 1
+secure_boot_paths || exit 1
 for service in ssh apache2 vsftpd ufw; do
     secure_service_permissions "$service" || exit 1
 done

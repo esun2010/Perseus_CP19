@@ -14,7 +14,7 @@ suspicious_service_family() {
         rsh-server|rshd|rlogind|rexecd|rsh-redone-server) echo rsh ;;
         tftpd*|tftp-hpa|tftp|atftpd) echo tftp ;;
         nfs-server|nfs-kernel-server|nfsd|mountd|rpcbind) echo nfs ;;
-        snmpd|net-snmp*) echo snmp ;;
+        snmpd|net-snmp*) echo snmpd ;;
         avahi-daemon|avahi) echo avahi ;;
         cups|cupsd|cups-daemon|cups-browsed) echo cups ;;
         redis|redis-server|redis[0-9]*) echo redis ;;

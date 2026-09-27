@@ -13,3 +13,7 @@
 /platforms/FreeBSD/log/*
 !/platforms/FreeBSD/log/.gitkeep
 **/__pycache__/
+
+# Separate service launcher progress
+.run_all_services_status
+.run_all_services_status.*

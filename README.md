@@ -1,5 +1,60 @@
 # Combined Linux and FreeBSD toolkit
 
+## Additional Linux system components and services
+
+The two launchers expose the following tasks. Run the normal launcher for
+non-service components and the service launcher for service configuration.
+Startup repairs belong to the normal launcher; reconciliation belongs to the
+service launcher. These additions target the Linux Debian/Ubuntu/Mint
+scripts, not the separate FreeBSD implementation.
+
+| Folder | Tasks / scripts | Behavior |
+| --- | --- | --- |
+| `misc/` | `nss.sh`, `openssl.sh`, `grub.sh`, `selinux.sh` | Protect configuration permissions and check name lookups, OpenSSL cipher loading, GRUB syntax, or SELinux runtime enforcement. |
+| `misc/` | `netfilter.sh` | Save available IPv4/IPv6 iptables and nftables rules in private backups. Existing `services/ufw.sh` remains the firewall policy writer. |
+| `misc/` | `dhclient.sh` | Protect existing ISC DHCP client configuration and hook permissions without renewing leases. DHCP clients often run under a network manager rather than a dedicated service. |
+| `services/` | `sssd.sh`, `dhcpd.sh`, `nfs-server.sh`, `avahi.sh`, `cupsd.sh`, `snmpd.sh` | Check existing scenario-specific services when listed in `input/critical_services.txt`. |
+| `services/extended/` | `fail2ban.sh`, `chrony.sh`, `ntpd.sh`, `rsyslog.sh`, `acpid.sh`, `smartd.sh` | Check installed, active general system/security services without requiring a critical-list entry. Hardware support remains optional on machines that do not use it. |
+| `services/` | Existing `ssh.sh` | OpenSSH server hardening; select `ssh` or its `openssh` alias. |
+
+`run_all.sh` contains only non-service tasks. Service selection lives in
+`run_all_services.sh`, including `services/extended/`. There is no Linux
+`RUN_SERVICES` toggle to turn services back on in the normal launcher.
+Select `netfilter` (alias `iptables`), `nfs` (alias `nfs-server`), `cups` (alias
+`cupsd`), `chrony` (aliases `chronyd` and `crony`), or the other listed task names.
+Scripts may also be run individually with `sudo bash path/to/script.sh`.
+
+The new service scripts do not install packages, start inactive daemons, alter
+boot enablement, or replace scenario-specific settings. Unlisted new role
+services are preserved rather than automatically disabled; in particular, SSSD
+may be essential for domain logins. Extended services that are absent/inactive
+are logged as skipped. Listing one as critical makes absence/inactivity an error.
+Choose **one** of Chrony and ntpd; the parser rejects both as critical. No time
+provider is installed or replaced automatically.
+
+These are conservative permission-hardening and review scripts, not complete
+service deployments. Native offline checks are used for SSSD, Fail2ban, Chrony,
+ISC DHCP server, CUPS, and rsyslog. Other profiles explicitly log review items
+without claiming a full syntax/security audit. Native validator output is saved
+in root-only backups because it may include secrets. Permissions preserve existing
+daemon owners/groups. Custom configuration locations and includes outside the
+listed standard paths need separate review. SSSD weak TLS/unrestricted access,
+permissive NFS exports, SNMP community access and Avahi reflection produce a
+nonzero result for scenario-specific remediation. Checks are not exhaustive.
+
+SELinux is never enabled blindly: a detected non-enforcing state is reported as
+pending with a nonzero exit; systems without its tools keep their existing LSM.
+GRUB checks do not regenerate the bootloader or set a password. OpenSSL checks do
+not replace certificates, keys, providers, or individual application TLS policy.
+No new firewall ports are opened automatically for DHCP, NFS/RPC, SNMP, printing
+or mDNS. Add only scenario-approved firewall rules; interface/subnet restrictions
+and dynamic RPC ports need additional review.
+
+Validator references: [Chrony `-p`](https://chrony-project.org/doc/4.9/chronyd.html),
+[SSSD configuration checker](https://sssd.io/design-pages/config_check_tool.html),
+and [Netfilter documentation](https://netfilter.org/documentation/).
+
+
 The FreeBSD project is bundled under `platforms/FreeBSD`; this repository now
 contains both implementations. No separate checkout is required.
 
@@ -48,35 +103,48 @@ stop the launcher before any scripts run.
 sudo bash run_all.sh
 ```
 
-`RUN_SERVICES` near the top of `run_all.sh` defaults to `1`. Set its default to
-`0`, or run `sudo env RUN_SERVICES=0 bash run_all.sh`, to skip every script under
-`services/`, including service reconciliation and the firewall. This also applies
-to the bundled FreeBSD launcher. Disabled service tasks display `N/a`, even with
-`all` or explicit service keywords; their saved progress is preserved. Other
-selected tasks, initial repairs and package upgrades still run.
+The normal launcher accepts interactive non-service keywords, `auto` (all scripts), or Enter to
+resume unfinished tasks. It never selects service scripts or reconciliation,
+even if `RUN_SERVICES=1` is present in the environment. Its FreeBSD dispatch also
+forces service tasks off. Package upgrades and general system hardening remain
+part of the normal launcher.
 
-The launcher only accepts interactive selection; command-line arguments and
-the former `services` mode are removed. Every task script is shown in the menu.
-Enter its displayed keywords separated by spaces, or enter `all` to select
-every task. Press Enter without keywords to resume unfinished eligible tasks in
-order, starting with the first `not_run` task. Explicit keywords (or `all`)
-rerun completed tasks. Shared helper libraries and test scripts are not runnable tasks.
-All service scripts, including UFW, are automatically skipped unless listed
-in `input/critical_services.txt`, even if explicitly selected. The menu and final
-status list show `ran` for tasks completed successfully across launcher runs,
-`not_run` for tasks that have not completed successfully, and `N/a` for services
-not listed as critical. Failed tasks and tasks blocked by a failed service stay
-`not_run`; the result summary gives the failure or skip reason. Progress is saved after each successful task in the local, Git-ignored
-`.run_all_status` file. A rerun clears its previous success before starting, so
-failure or interruption leaves it retryable. Remove `.run_all_status` to reset
-all progress for a new scenario.
-`all` includes account/password changes, package removal, and a media inventory;
-their existing prompts remain. Selecting an eligible service also selects UFW
-if UFW is critical. Selecting critical UFW also sets up all listed
-services so their actual ports can be discovered. When resuming, already
-completed services are skipped; UFW is refreshed when a service is retried. A failed service causes UFW
-to be skipped, and the launcher returns a failure summary. Other existing
-scripts may also affect service accounts and files; review the scenario first.
+For Linux services, use the separate launcher:
+
+```bash
+sudo bash run_all_services.sh
+```
+
+Both launchers show the same `ran` / `not_run` status format. The service launcher
+also shows `N/a` for unlisted role services. Enter service keywords, `all` for all
+eligible services, `auto` for only the entries in
+`input/critical_services.txt`, or Enter to resume unfinished eligible services.
+Both launchers prompt for selection and reject command-line arguments. `auto`
+reruns critical services even if they previously completed. Extended services
+are included in `auto` only when listed as critical; manual selection and
+`all` can include them without a critical entry. Role services, including SSH
+and UFW, still require a critical-list entry even when selected manually.
+
+Enter `ssh rsyslog`, for example, at the service prompt. `all` remains an alias
+for all non-service scripts in the normal launcher; `auto_run` remains a legacy
+alias for `auto` at the service prompt.
+
+Service reconciliation runs first, including when the critical list is `none`.
+It can disable unlisted managed services according to the policy below.
+Selecting a critical service also selects UFW if UFW is critical; UFW selection
+includes the critical services needed for listener discovery. UFW runs last and
+is skipped if a preceding service fails. CMS selections include their listed
+web/database dependencies. The service launcher does not run the normal
+launcher's system repairs or blanket package upgrade; individual service scripts
+retain their own package and configuration behavior. It currently targets Linux;
+FreeBSD service management remains in the native FreeBSD launcher.
+
+Progress is stored separately in `.run_all_status` and
+`.run_all_services_status`, both ignored by Git. A rerun clears previous success
+before starting so failure/interruption leaves that task retryable. Delete the
+corresponding file to reset progress. Non-service `all` still includes
+account/password changes, package removal and media inventory, with their
+existing prompts.
 
 - SSH installs OpenSSH, prohibits root and empty-password login globally, limits
   authentication attempts, validates configuration, and starts/enables SSH at
@@ -91,7 +159,7 @@ scripts may also affect service accounts and files; review the scenario first.
   preserves the local upload policy (a fresh install is read-only). Explicit
   FTPS is required by default, using a generated self-signed certificate that
   clients must trust. For a scenario requiring plaintext FTP, use
-  `sudo env VSFTPD_TLS_REQUIRED=NO bash run_all.sh`, then select `vsftpd` or `all`. Existing filesystem
+  `sudo env VSFTPD_TLS_REQUIRED=NO bash run_all_services.sh`, then select `vsftpd` or `all`. Existing filesystem
   permissions, account restrictions and NAT forwarding still apply.
 - UFW installs/enables the firewall and boot startup, allows required ports
   before enabling deny-incoming/allow-outgoing defaults, and preserves existing
@@ -126,7 +194,8 @@ Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
 | --- | --- |
 | `README.md` | Explains how to select tasks, configure critical services, run checks, and understand the project files. |
 | `.gitattributes` | Tells Git to use Linux-style LF line endings for shell scripts. |
-| `run_all.sh` | Shows an interactive menu for all 13 task scripts and runs selected tasks in order. It skips unlisted services and skips UFW if a required service fails. |
+| `run_all.sh` | Interactive non-service tasks with saved progress; never selects service scripts. |
+| `run_all_services.sh` | Service keyword selection, critical-list `auto`, separate progress, reconciliation first and UFW last. |
 | `input/critical_services.txt` | Lists the services required by the scenario and any additional firewall ports to allow. Use one service per line, including `ufw` when needed, or `none` when no services are required. |
 | `all_logs.txt` | Stores the shared, accumulating audit log with timestamps and script names. Scripts using the logging helper record configuration changes, permissions, actions, and failures here. |
 | `logging.sh` | Provides shared functions for logging actions, comparing configuration files before and after edits, and recording permission changes. Other scripts source this helper rather than run it as a task. |
@@ -380,9 +449,9 @@ python3 tests/backup_commands_test.py
 
 ### Managed service policy
 
-This policy runs only when `RUN_SERVICES=1` (the default).
+On Linux this policy runs in `run_all_services.sh` or individual managed-service scripts, never in the normal launcher.
 
-Before each launcher run (including resume), unlisted BIND9, MySQL/MariaDB, Postfix, Sendmail, Samba, WordPress, Joomla, OpenVPN and Nginx are **disabled, never automatically uninstalled**. Packages, databases and site files remain in place. Review `input/critical_services.txt` against the competition README first. Empty lists are rejected; `none` explicitly disables all managed services. Ubuntu stops, disables and persistently masks systemd units; FreeBSD stops native services, writes boot flags and checks that services are no longer boot-enabled. Custom service names/startup jobs need manual review.
+Before each service-launcher run (including resume), unlisted BIND9, MySQL/MariaDB, Postfix, Sendmail, Samba, WordPress, Joomla, OpenVPN and Nginx are **disabled, never automatically uninstalled**. Packages, databases and site files remain in place. Review `input/critical_services.txt` against the competition README first. Empty lists are rejected; `none` explicitly disables all managed services. Ubuntu stops, disables and persistently masks systemd units; FreeBSD stops native services, writes boot flags and checks that services are no longer boot-enabled. Custom service names/startup jobs need manual review.
 
 WordPress/Joomla have no separate daemon. Their discovered document roots are backed up and made inaccessible with mode `000`, which survives reboot and blocks ordinary unprivileged web workers. Original modes are saved privately in `/var/lib/cyberpatriot/disabled-sites` and restored when the application becomes critical again. This assumes normal, unprivileged web workers; custom root-running web applications need manual isolation. Overlap with a critical site's root stops the operation. Usual locations are `/var/www`, `/usr/share/wordpress`, `/usr/local/www`; add custom roots in `input/web_apps.txt`. Existing critical CMS configuration is checked only when Apache or Nginx is explicitly critical. No web/database dependency becomes critical implicitly.
 
@@ -390,7 +459,7 @@ Each managed service has a script under `services/`; `mariadb.sh` and `smb.sh` a
 
 ### Initial system repairs
 
-`run_all.sh` sets a trusted PATH before its first external command. After validating task selection and root access, it runs `service_helpers/startup_repair.sh` before service reconciliation, upgrades or selected tasks, including on resume. Any failed repair stops subsequent tasks.
+`run_all.sh` sets a trusted PATH before its first external command. After validating task selection and root access, it runs `service_helpers/startup_repair.sh` before upgrades or selected non-service tasks, including on resume. Any failed repair stops subsequent tasks.
 
 Ubuntu scans `/etc`, `/var/lib/dpkg`, `/var/lib/apt` and `/var/cache/apt` for immutable/append-only flags. It backs up affected paths, records original flags in the backup, then clears the flags. It also repairs the default login PATH in `/etc/environment`, preserving other variables. Individual shell startup files can still override PATH and need manual review. FreeBSD performs the native flag repair in `/etc`, `/usr/local/etc` and `/var/db/pkg`; securelevel restrictions may require single-user repair. Neither implementation clears flags across the whole filesystem.
 
@@ -463,3 +532,39 @@ Configuration references: [Debian APT sources](https://wiki.debian.org/SourcesLi
 [Ubuntu GDM package files](https://packages.ubuntu.com/noble/all/gdm3/filelist),
 [SDDM configuration](https://manpages.debian.org/testing/sddm/sddm.conf.5.en.html),
 and [Mint archive components](https://packages.linuxmint.com/list.php?release=una).
+
+## Additional kernel and sensitive-path coverage
+
+`misc/kernel.sh` already applied ASLR (`kernel.randomize_va_space=2`), SYN cookies,
+IPv4 accept/send redirect restrictions, source-route restrictions, reverse-path
+filtering, and the listed ICMP protections. It now also persists and verifies:
+
+- `fs.protected_hardlinks=1` and `fs.protected_symlinks=1`.
+- `kernel.sysrq=0`.
+- `net.ipv4.conf.all.secure_redirects=0` and the corresponding `default` value.
+
+The `/proc/sys/...` paths correspond to these dotted sysctl names. Settings are
+saved in `/etc/sysctl.d/99-hardening.conf` and applied to the running kernel.
+IPv4 `net.ipv4.ip_forward` and IPv6 `net.ipv6.conf.all.forwarding` are now
+unconditionally persisted and applied as `0` by the `ker` task. The previous
+`input/forwarding.txt` option has been removed. Run `ker` explicitly after this
+update if it was already marked complete. Both settings are written to
+`/etc/sysctl.d/99-hardening.conf`, applied immediately and read back for
+verification. Forwarding changes precede the other network settings because
+changing IPv4 forwarding resets some defaults; see the
+[Linux kernel IP sysctl documentation](https://kernel.org/doc/html/latest/networking/ip-sysctl.html).
+
+
+The existing `per` task (`misc/file_permissions.sh`) now also covers:
+
+| Paths | Action |
+| --- | --- |
+| Local interactive users' homes and root: `.bash_profile`, `.bashrc`, `.bash_login`, `.profile`, `.zshrc`, `.bash_history` | Owner-only permissions; contents retained. Homes come from `/etc/passwd`, including homes outside `/home`. |
+| The same homes: `.ssh/authorized_keys`, `.ssh/config`, `.ssh/id_rsa`, `.ssh/id_ed25519` | Owner-only files and `.ssh` directory; no key/history contents logged. Linked paths are reported for review rather than followed. |
+| `/lib/systemd/system/`, `/usr/lib/systemd/system/` | Root ownership and removal of group/other write access for regular units/drop-ins, including sshd, nginx, httpd, rsyslog and auditd when present. Distribution aliases resolve; links inside the trees remain unchanged. Vendor units also join the malware persistence inventory. |
+| `/usr/share/ca-certificates/`, `/etc/pki/tls/certs/`, `/etc/pki/ca-trust/source/anchors/`, `/usr/local/share/ca-certificates/` | Protect existing regular certificate files/directories; trust membership and symlink targets remain unchanged. |
+| `/boot/grub/grub.cfg`, `/boot/grub2/grub.cfg`, `/boot/efi/EFI/{ubuntu,centos,redhat}/grub.cfg`, `/boot/loader/entries/` | Owner-only regular files/directories on POSIX filesystems. FAT EFI filesystems are reported for mount-permission review instead of ineffective chmod. Also included in the `grub` task. |
+
+Absent optional paths are not created. These path checks do not imply CentOS or
+Red Hat launcher support. Certificate trust, SSH key authorization and boot-entry
+contents still require scenario review; no trust store or bootloader is rebuilt.
