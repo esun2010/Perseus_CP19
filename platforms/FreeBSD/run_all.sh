@@ -1,5 +1,11 @@
 #!/usr/local/bin/bash
 set -uo pipefail
+# Set to 0 to skip all services/ scripts, including reconciliation and the firewall.
+export RUN_SERVICES="${RUN_SERVICES:-1}"
+case "$RUN_SERVICES" in
+    0|1) ;;
+    *) echo 'RUN_SERVICES must be 0 (skip) or 1 (run).' >&2; exit 1 ;;
+esac
 # Repair command lookup before invoking any external command.
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/sbin:/usr/local/bin
 hash -r
@@ -42,7 +48,7 @@ declare -A SCRIPT_MAP=(
     [pf]=services/pf.sh
 )
 declare -A DESCRIPTION=(
-    [svc]='Disable unlisted managed services (always runs)'
+    [svc]='Disable unlisted managed services (runs when RUN_SERVICES=1)'
     [bind9]='Configure BIND DNS'
     [mysql]='Configure existing MySQL/MariaDB or install MariaDB'
     [postfix]='Configure Postfix'
@@ -97,7 +103,9 @@ declare -A TASK_STATUS=()
 for key in "${ORDER[@]}"; do
     TASK_STATUS["$key"]=not_run
     [[ -z "${COMPLETED[$key]:-}" ]] || TASK_STATUS["$key"]=ran
-    if [[ "$key" != svc && "${SCRIPT_MAP[$key]}" == services/* ]] && ! critical_service "$key"; then
+    if [[ "$RUN_SERVICES" == 0 && "${SCRIPT_MAP[$key]}" == services/* ]]; then
+        TASK_STATUS["$key"]='N/a'
+    elif [[ "$key" != svc && "${SCRIPT_MAP[$key]}" == services/* ]] && ! critical_service "$key"; then
         TASK_STATUS["$key"]='N/a'
     fi
 done
@@ -166,6 +174,11 @@ SCRIPTS=()
 for key in "${ORDER[@]}"; do
     [[ -n "${SELECTED[$key]:-}" ]] || continue
     script=${SCRIPT_MAP[$key]}
+    if [[ "$RUN_SERVICES" == 0 && "$script" == services/* ]]; then
+        echo "Skipping $script: RUN_SERVICES=0."
+        unset 'SELECTED[$key]'
+        continue
+    fi
     [[ -f "$SCRIPT_DIR/$script" ]] || { echo "Missing script: $script" >&2; exit 1; }
     SCRIPTS+=("$script")
 done
@@ -178,17 +191,19 @@ init_logging
 source "$SCRIPT_DIR/service_helpers/startup_repair.sh"
 startup_repair || { log "FAILED initial system repairs; tasks stopped"; exit 1; }
 # Do not proceed with other changes if service disabling could not complete.
-unset 'COMPLETED[svc]'
-TASK_STATUS[svc]=not_run
-save_status || exit 1
-if ! bash "$SCRIPT_DIR/services/reconcile.sh"; then
-    log 'FAILED service policy; remaining tasks were not run'
-    exit 1
+if [[ "$RUN_SERVICES" == 1 ]]; then
+    unset 'COMPLETED[svc]'
+    TASK_STATUS[svc]=not_run
+    save_status || exit 1
+    if ! bash "$SCRIPT_DIR/services/reconcile.sh"; then
+        log 'FAILED service policy; remaining tasks were not run'
+        exit 1
+    fi
+    COMPLETED[svc]=1
+    TASK_STATUS[svc]=ran
+    save_status || exit 1
+    if ((${#SCRIPTS[@]} == 1)); then log "Service policy complete; no other tasks selected"; exit 0; fi
 fi
-COMPLETED[svc]=1
-TASK_STATUS[svc]=ran
-save_status || exit 1
-if ((${#SCRIPTS[@]} == 1)); then log "Service policy complete; no other tasks selected"; exit 0; fi
 # Refresh package metadata before upgrading; keep pkg's normal upgrade prompt.
 require_commands pkg || exit 1
 backup_package_configuration || exit 1

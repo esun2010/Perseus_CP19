@@ -48,6 +48,13 @@ stop the launcher before any scripts run.
 sudo bash run_all.sh
 ```
 
+`RUN_SERVICES` near the top of `run_all.sh` defaults to `1`. Set its default to
+`0`, or run `sudo env RUN_SERVICES=0 bash run_all.sh`, to skip every script under
+`services/`, including service reconciliation and the firewall. This also applies
+to the bundled FreeBSD launcher. Disabled service tasks display `N/a`, even with
+`all` or explicit service keywords; their saved progress is preserved. Other
+selected tasks, initial repairs and package upgrades still run.
+
 The launcher only accepts interactive selection; command-line arguments and
 the former `services` mode are removed. Every task script is shown in the menu.
 Enter its displayed keywords separated by spaces, or enter `all` to select
@@ -348,6 +355,8 @@ python3 tests/backup_commands_test.py
 ```
 
 ### Managed service policy
+
+This policy runs only when `RUN_SERVICES=1` (the default).
 
 Before each launcher run (including resume), unlisted BIND9, MySQL/MariaDB, Postfix, Sendmail, Samba, WordPress, Joomla, OpenVPN and Nginx are **disabled, never automatically uninstalled**. Packages, databases and site files remain in place. Review `input/critical_services.txt` against the competition README first. Empty lists are rejected; `none` explicitly disables all managed services. Ubuntu stops, disables and persistently masks systemd units; FreeBSD stops native services, writes boot flags and checks that services are no longer boot-enabled. Custom service names/startup jobs need manual review.
 

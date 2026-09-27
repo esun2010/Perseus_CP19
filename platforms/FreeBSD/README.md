@@ -270,6 +270,13 @@ python3 tests/backup_commands_test.py
 
 ### Managed service policy
 
+Set the `RUN_SERVICES` default near the top of `run_all.sh` to `0`, or run
+`env RUN_SERVICES=0 bash run_all.sh` as root, to skip all `services/` scripts,
+including reconciliation and PF. The default is `1` (enabled). Disabled service
+tasks display `N/a` and retain their saved progress. Other selected tasks,
+initial repairs and package upgrades still run. The policy below applies only
+when `RUN_SERVICES=1`.
+
 Before each launcher run (including resume), unlisted BIND9, MySQL/MariaDB, Postfix, Sendmail, Samba, WordPress, Joomla, OpenVPN and Nginx are **disabled, never automatically uninstalled**. Packages, databases and site files remain in place. Review `input/critical_services.txt` against the competition README first. Empty lists are rejected; `none` explicitly disables all managed services. Ubuntu stops, disables and persistently masks systemd units; FreeBSD stops native services, writes boot flags and checks that services are no longer boot-enabled. Custom service names/startup jobs need manual review.
 
 WordPress/Joomla have no separate daemon. Their discovered document roots are backed up and made inaccessible with mode `000`, which survives reboot and blocks ordinary unprivileged web workers. Original modes are saved privately in `/var/lib/cyberpatriot/disabled-sites` and restored when the application becomes critical again. This assumes normal, unprivileged web workers; custom root-running web applications need manual isolation. Overlap with a critical site's root stops the operation. Usual locations are `/var/www`, `/usr/share/wordpress`, `/usr/local/www`; add custom roots in `input/web_apps.txt`. Existing critical CMS configuration is checked only when Apache or Nginx is explicitly critical. No web/database dependency becomes critical implicitly.
