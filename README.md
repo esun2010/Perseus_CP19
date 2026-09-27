@@ -140,7 +140,7 @@ Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
 | `misc/kernel.sh` | Applies persistent and runtime sysctl hardening for networking and kernel protections. It also adjusts `/tmp` and `/dev/shm` permissions and mount options, including their existing fstab entries. |
 | `misc/login.sh` | Locks the optional guest account and disables its shell. Detects the selected LightDM, GDM or SDDM manager and saves login protection without restarting the active desktop. SSH policy remains in `services/ssh.sh`. |
 | `misc/file_permissions.sh` | Sets permissions on selected system files, directories, and user home directories. It also generates a report of world-writable files and directories. |
-| `password_management/pwd_policy.sh` | Sets password-aging defaults in `/etc/login.defs` and a minimum password length of 12 in `/etc/security/pwquality.conf`. It installs libpam-pwquality if needed and enables the packaged PAM profile without forcing replacement of custom PAM stacks. |
+| `password_management/pwd_policy.sh` | Creates/configures `login.defs`, `pwquality.conf` and `faillock.conf` for account defaults, password complexity and failed-login lockout. Enables and verifies PAM profiles, preserving backups and refusing incompatible custom stacks. |
 | `password_management/reset_admin_pwd.sh` | Reads `auth_admins.txt` and resets each existing listed account to the script's `NEW_PASSWORD` value, currently `ChangeMe123!`. Edit that value before running if a different password is required. |
 | `rm_stuff/rm_mp3+.sh` | Writes a read-only MP3/MOV/MP4 inventory to `log/media_files(2).txt`; reviewed removal is performed by `rm_stuff/rm_mp3+_2.sh` in the second launcher. |
 | `rm_stuff/bad_pkg.sh` | Presents a list of potentially unwanted packages for optional editing and asks for confirmation before purging installed matches. After removal, it runs package autoremove. |
@@ -271,14 +271,38 @@ at most `0640`; root/syslog ownership and existing groups are retained as
 appropriate for logging. Absent logs are not created or logging destinations
 changed. Log rotation settings must also retain these permissions for new logs.
 
-Password management backs up PAM and password configuration to a root-only
-`/var/backups/cyberpatriot-password-policy.*` directory, configures 12-character
-password quality without length credits, enables the packaged pwquality profile,
-and checks that it is required by `common-password`. Custom PAM stacks are not
-force-overwritten; failures stop the task for review with the backup location
-logged. Existing account expiration settings and PAM module binaries are not
-rewritten. Module arguments can override configuration-file settings; inspect
-custom overrides. See [pam-auth-update](https://manpages.debian.org/bookworm/libpam-runtime/pam-auth-update.8.en.html).
+The `pol` task backs up PAM and password configuration under the private
+`/var/backups/cyberpatriot/` snapshot directory, then creates any missing files
+below (and `/etc/security` if needed). It preserves comments and unrelated
+settings, replaces duplicate managed settings, and applies root ownership with
+permissions no broader than `0644`.
+
+| File | Managed settings |
+| --- | --- |
+| `/etc/login.defs` | Password maximum/minimum/warning ages `90/1/7` days; regular UID/GID range `1000–60000`; system UID/GID range `100–999`; `UMASK 027`, `HOME_MODE 0750`, `LOGIN_RETRIES 5`, `LOGIN_TIMEOUT 60`. Retains `YESCRYPT` when present, otherwise selects `SHA512`. |
+| `/etc/security/pwquality.conf` | Minimum 12 characters with at least one uppercase, lowercase, digit and special character; four new characters when comparing old/new passwords; at most three identical consecutive characters; dictionary and username checks; enforcement enabled. |
+| `/etc/security/faillock.conf` | Five consecutive failures within 900 seconds trigger a 900-second lockout. `silent` avoids revealing account existence; `local_users_only` leaves directory-service lockout to its own provider. Existing root/admin lockout options are retained. |
+
+Password aging and UID/GID settings are defaults for future account creation;
+existing account ages and IDs are unchanged. PAM controls password hashing, so
+`ENCRYPT_METHOD` does not replace PAM's existing hash policy. Root password-quality
+exemption is unchanged unless `enforce_for_root` is already configured. FreeBSD
+continues to use its native `login.conf`/PAM policy rather than these Linux files.
+
+The task installs `libpam-pwquality` if needed and enables its packaged profile.
+Two bundled `pam-auth-update` profiles place the lockout check before authentication,
+failure recording after failed authentication, and counter reset in the account
+phase. The task verifies required modules and ordering and rejects policy arguments
+that override `pwquality.conf`. Custom PAM stacks are not force-overwritten;
+refused, failed or unverifiable updates restore the previous common stacks and
+stop for review, with the backup location logged. See the
+[PAM profile manager](https://manpages.debian.org/bookworm/libpam-runtime/pam-auth-update.8.en.html),
+[password-quality options](https://manpages.debian.org/bookworm/libpwquality-common/pwquality.conf.5.en.html)
+and [lockout module configuration](https://manpages.debian.org/bookworm/libpam-modules/pam_faillock.8.en.html).
+
+Run `python3 tests/password_policy_test.py` on Debian/Ubuntu for isolated creation,
+repeat-run, preservation, PAM rollback and actual lockout checks. All generated
+PAM configurations, debconf data and failure counters stay in temporary directories.
 
 Run `python3 tests/auth_permissions_test.py` for temporary-file checks of account,
 PAM, module, and log permissions, backups, symlink handling, and repeat runs. These tests
