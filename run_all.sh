@@ -132,36 +132,36 @@ if [[ "$CP_DISTRO" == freebsd ]]; then
     log 'RUN pkg upgrade'
     pkg upgrade || exit 1
 else
-# Refresh package metadata before upgrading; stop if either command fails.
-log "RUN sudo apt update"
-if sudo apt update; then
-    log "PASS sudo apt update"
-else
-    status=$?
-    log "FAILED sudo apt update (exit $status)"
-    exit "$status"
-fi
-backup_package_configuration || exit 1
-log "RUN sudo apt upgrade"
-if sudo apt upgrade; then
-    log "PASS sudo apt upgrade"
-else
-    status=$?
-    log "FAILED sudo apt upgrade (exit $status)"
-    exit "$status"
-fi
-# Install only standard inspection utilities; never install suspect tools.
-if [[ -n "${SELECTED[mal]:-}" ]]; then
-    unset 'COMPLETED[mal]'
-    TASK_STATUS[mal]=not_run
-    save_status || { echo "Cannot save task status to $STATE_FILE" >&2; exit 1; }
-    log 'Ensuring malware scan dependencies: procps iproute2 file findutils grep sed coreutils'
-    backup_package_configuration || exit 1
-    if ! apt-get install -y procps iproute2 file findutils grep sed coreutils; then
-        log 'FAILED installing malware scan dependencies'
-        exit 1
+    # Refresh package metadata before upgrading; stop if either command fails.
+    log "RUN sudo apt update"
+    if sudo apt update; then
+        log "PASS sudo apt update"
+    else
+        status=$?
+        log "FAILED sudo apt update (exit $status)"
+        exit "$status"
     fi
-fi
+    backup_package_configuration || exit 1
+    log "RUN sudo apt upgrade"
+    if sudo apt upgrade; then
+        log "PASS sudo apt upgrade"
+    else
+        status=$?
+        log "FAILED sudo apt upgrade (exit $status)"
+        exit "$status"
+    fi
+    # Install only standard inspection utilities; never install suspect tools.
+    if [[ -n "${SELECTED[mal]:-}" ]]; then
+        unset 'COMPLETED[mal]'
+        TASK_STATUS[mal]=not_run
+        save_status || { echo "Cannot save task status to $STATE_FILE" >&2; exit 1; }
+        log 'Ensuring malware scan dependencies: procps iproute2 file findutils grep sed coreutils'
+        backup_package_configuration || exit 1
+        if ! apt-get install -y procps iproute2 file findutils grep sed coreutils; then
+            log 'FAILED installing malware scan dependencies'
+            exit 1
+        fi
+    fi
 fi
 declare -A RESULTS=()
 FAILED=0

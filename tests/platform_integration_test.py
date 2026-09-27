@@ -101,6 +101,15 @@ source "$REPOSITORY/service_helpers/managed_services.sh"
 [[ $(declare -f installed_server_packages) == *"pkg query"* ]]
 source "$REPOSITORY/service_helpers/second_pass_accounts.sh"
 [[ "$SECOND_ROOT" == "$REPOSITORY" ]]
+id() { echo 0; }
+sysctl() { echo 0; }
+account_platform_init
+[[ "$ACCOUNT_PLATFORM" == freebsd ]]
+backup_system_paths() { printf '%s\n' "$*"; }
+[[ $(backup_account_databases) == '/etc/master.passwd /etc/passwd /etc/group /etc/pwd.db /etc/spwd.db' ]]
+[[ $(backup_package_configuration) == '/etc /usr/local/etc' ]]
+stat() { [[ "$1" == -f && "$2" == %Lp ]]; echo 640; }
+[[ $(audit_file_mode /fixture) == 640 ]]
 '''], env=dict(os.environ, REPOSITORY=str(ROOT)), capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
 

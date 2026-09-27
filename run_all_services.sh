@@ -165,7 +165,7 @@ for key in "${INPUT[@]}"; do
             SELECTED["$key"]=1 ;;
     esac
 done
-# Skip every unlisted service, including UFW, even when explicitly selected.
+# Skip every unlisted service, including the firewall, even when explicitly selected.
 for key in "${SERVICE_KEYS[@]}"; do
     if [[ -n "${SELECTED[$key]:-}" ]]; then
         if ! critical_service "$key"; then
@@ -176,7 +176,7 @@ for key in "${SERVICE_KEYS[@]}"; do
         fi
     fi
 done
-# UFW needs configured, running critical services to discover the actual ports.
+# The firewall needs running critical services to discover their actual ports.
 if [[ -n "${SELECTED[$FIREWALL_KEY]:-}" ]]; then
     for key in "${CRITICAL_SERVICES[@]}"; do
         if ((RESUME == 0)) || [[ "${TASK_STATUS[$key]}" != ran ]]; then
