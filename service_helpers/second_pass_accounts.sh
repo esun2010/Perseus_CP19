@@ -100,8 +100,8 @@ account_review() {
     load_authorized_accounts || return 1
     tmp_users=$(mktemp "$users.XXXXXX") || return 1
     tmp_admins=$(mktemp "$admins.XXXXXX") || return 1
-    printf '# Second-pass user deletion candidates: username<TAB>UID. Remove lines to retain accounts.\n' > "$tmp_users"
-    printf '# Second-pass administrator revocation candidates: username<TAB>UID.\n' > "$tmp_admins"
+    printf '# Second-pass user deletion candidates: username<TAB>UID. Remove or comment out lines to retain accounts.\n' > "$tmp_users"
+    printf '# Second-pass administrator revocation candidates: username<TAB>UID. Remove or comment out lines to retain administrator access.\n' > "$tmp_admins"
     while IFS=: read -r name _ uid gid _ _ shell; do
         [[ -n "$name" && "$name" != root ]] || continue
         [[ "$uid" =~ ^[0-9]+$ ]] || return 1
@@ -206,40 +206,22 @@ revoke_local_doas() {
     done
 }
 
-restrict_polkit_admins() {
-    local base=/etc/polkit-1 vendor=/usr/share/polkit-1/rules.d rule name file temp user
-    [[ "$ACCOUNT_PLATFORM" != freebsd ]] || { base=/usr/local/etc/polkit-1; vendor=/usr/local/share/polkit-1/rules.d; }
-    [[ -d "$vendor" ]] || return 0
-    name=00-000-cyberpatriot-second-pass.rules
-    rule="$base/rules.d/$name"
-    [[ ! -L "$base" && ! -L "$base/rules.d" && ! -L "$rule" ]] || return 1
-    for file in "$base/rules.d/"*.rules "$vendor/"*.rules; do
-        [[ -f "$file" ]] || continue
-        if [[ "${file##*/}" < "$name" ]]; then log "FAILED earlier polkit admin policy needs review: $file"; return 1; fi
-    done
-    backup_system_paths "$rule" || return 1
-    mkdir -p "$base/rules.d" || return 1
-    temp=$(mktemp "$base/rules.d/.second-pass.XXXXXX") || return 1
-    {
-        printf '// Second-pass authorized administrator identities.\npolkit.addAdminRule(function(action, subject) { return ["unix-user:root"'
-        for user in "${!AUTH_ADMINS[@]}"; do [[ "$user" == root ]] || printf ', "unix-user:%s"' "$user"; done
-        printf ']; });\n'
-    } > "$temp" || return 1
-    chmod 644 "$temp" && mv "$temp" "$rule" || return 1
-    log 'UPDATED polkit administrator identities; custom action rules granting YES require separate review'
-}
-
 account_cleanup() {
     local user uid status=0
     declare -gA DELETE_USERS=() REVOKE_ADMINS=()
     load_authorized_accounts || return 1
     load_review_candidates "$SECOND_ROOT/log/unauth_users(2).txt" users || return 1
     load_review_candidates "$SECOND_ROOT/log/unauth_admins(2).txt" admins || return 1
+    # These reviewed lists are the only source of mutation targets. Never
+    # regenerate them here or derive a global administrator allowlist from input/.
+    if ((${#DELETE_USERS[@]} == 0 && ${#REVOKE_ADMINS[@]} == 0)); then
+        log 'NO CHANGES: no user deletions or administrator revocations remain in the reviewed logs'
+        return 0
+    fi
     # Apply and validate privilege policy before deleting any account.
     if ((${#REVOKE_ADMINS[@]})); then
         revoke_local_sudo || return 1
         revoke_local_doas || return 1
-        restrict_polkit_admins || return 1
         for user in "${!REVOKE_ADMINS[@]}"; do
             [[ -z "${DELETE_USERS[$user]:-}" ]] || continue
             remove_admin_groups "$user" || return 1

@@ -21,7 +21,7 @@ for report in 'unauth_users(2).txt' 'unauth_admins(2).txt' 'media_files(2).txt';
         exit 1
     }
 done
-log 'SECOND PASS: applying reviewed account and media cleanup'
+log 'SECOND PASS: applying only entries remaining in log/unauth_users(2).txt, log/unauth_admins(2).txt, and log/media_files(2).txt; inventories will not be regenerated'
 for task in user_management/user_management_2.sh 'rm_stuff/rm_mp3+_2.sh'; do
     log "RUN $task"
     if bash "$SCRIPT_DIR/$task" 2>&1 | tee -a "$LOG_FILE"; then log "PASS $task"

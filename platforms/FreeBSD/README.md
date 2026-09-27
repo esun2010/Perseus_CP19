@@ -310,9 +310,9 @@ The catalog includes the managed web, database, mail, file-sharing and VPN servi
 
 Populate `input/auth_users.txt` and `input/auth_admins.txt` first. At least one existing non-root administrator is required; administrator entries also count as authorized users. In `run_all.sh`, select `usr mp3` to generate the account and media inventories. These two first-pass tasks only report; they do not delete users or media. Other first-launcher tasks retain their existing behavior.
 
-Review `log/unauth_users(2).txt`, `log/unauth_admins(2).txt`, and `log/media_files(2).txt`. Remove whole candidate lines for accounts/files that must be retained, or correct the allowlists and rerun the audit. The account reports contain usernames and their numeric UIDs; the media report contains an identity signature, a tab, and the absolute path. Do not edit those identity fields.
+Review `log/unauth_users(2).txt`, `log/unauth_admins(2).txt`, and `log/media_files(2).txt`. Remove or comment out whole candidate lines for accounts/files that must be retained, or correct the allowlists and rerun the audit. The account reports contain usernames and their numeric UIDs; the media report contains an identity signature, a tab, and the absolute path. Do not edit those identity fields.
 
-Then run `sudo bash run_all_2.sh` on Ubuntu, or `bash run_all_2.sh` from a FreeBSD root shell. This explicit second launcher deletes reviewed unauthorized local accounts (retaining home directories), revokes reviewed administrator memberships and local sudo/doas access, restricts installed polkit administrator identities, and removes the reviewed media files after backing them up. It does not rerun upgrades or general hardening. User deletion is not forced: active sessions, UID-zero aliases, the invoking sudo/doas account, identity changes, or failed backups stop or fail cleanup for review. Revoked users must log out of existing sessions; existing root shells and custom polkit action grants require separate review.
+Then run `sudo bash run_all_2.sh` on Ubuntu, or `bash run_all_2.sh` from a FreeBSD root shell. This explicit second launcher deletes reviewed unauthorized local accounts (retaining home directories), revokes reviewed administrator memberships and local sudo/doas access, leaves global polkit policy unchanged, and removes the reviewed media files after backing them up. It does not rerun upgrades or general hardening. User deletion is not forced: active sessions, UID-zero aliases, the invoking sudo/doas account, identity changes, or failed backups stop or fail cleanup for review. Revoked users must log out of existing sessions; existing root shells and custom polkit action grants require separate review.
 
 Second-pass actions are appended to `log/user_management(2).txt`, `log/media_cleanup(2).txt`, and the combined `all_logs(2).txt`. Both cleanup scripts can also be run separately. Current allowlists are checked again, so newly authorized users are preserved. Missing or changed media is not blindly deleted. Root and system service accounts are not automatically treated as unauthorized ordinary users.
 
@@ -395,3 +395,17 @@ sudoers/polkit policies, and fstab mount options. Removed settings are recorded
 as `changed ... to <unset>`; unchanged values do not produce setting entries.
 Backups and full diffs remain available, including after partial edit failures.
 Run `python3 platforms/FreeBSD/tests/settings_logging_test.py` for isolated logging checks.
+
+Second-pass cleanup acts only on entries remaining in the three root review logs:
+
+- `log/media_files(2).txt`: files to delete.
+- `log/unauth_users(2).txt`: users to delete (home directories retained).
+- `log/unauth_admins(2).txt`: users whose privileged groups and local sudo/doas access should be revoked.
+
+Delete a line or prefix it with `#` to preserve that item. Keep the username/UID
+or file identity/path fields intact on retained removal entries. Empty or
+comment-only logs authorize no actions of that type; missing logs stop cleanup.
+Run `bash run_all_2.sh` after review. Do not rerun the first-pass inventory tasks
+between editing the logs and cleanup, because those tasks regenerate the lists.
+Second-pass cleanup never rescans for additional targets or rewrites the global
+polkit administrator policy. These rules apply to Linux and FreeBSD.

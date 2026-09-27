@@ -162,6 +162,67 @@ fi
         self.assertEqual((self.root/'run-calls').read_text(),'users\nusers\nmedia\n')
         self.assertEqual((self.root/'all_logs(2).txt').stat().st_mode & 0o777,0o600)
 
+    def test_edited_account_logs_preserve_unlisted_users_and_admins(self):
+        with (self.root/'passwd').open('a') as f:
+            f.write('dave:*:1003:1003::/home/dave:/bin/sh\n')
+        with (self.root/'input/auth_users.txt').open('a') as f:f.write('dave\n')
+        (self.root/'groups/dave').write_text('dave wheel' if BSD else 'dave sudo')
+        self.ok(self.run_script('account_review'))
+        users=self.root/'log/unauth_users(2).txt'
+        users.write_text('# Keep charlie despite absence from input/auth_users.txt\n')
+        admins=self.root/'log/unauth_admins(2).txt'
+        admins.write_text('\n'.join('# '+line if line.startswith('bob\t') else line
+                                    for line in admins.read_text().splitlines())+'\n')
+        # A second pass must not expand a reviewed list or rewrite global policy.
+        self.ok(self.run_script('''
+account_review() { return 91; }
+restrict_polkit_admins() { return 92; }
+account_cleanup
+'''))
+        self.assertIn('charlie:',(self.root/'passwd').read_text())
+        self.assertEqual((self.root/'groups/bob').read_text(),'bob wheel' if BSD else 'bob sudo')
+        self.assertEqual((self.root/'groups/dave').read_text(),'dave')
+        sudoers=(self.root/'etc/sudoers').read_text()
+        self.assertIn('bob ALL=(ALL:ALL) ALL',sudoers)
+        self.assertNotIn('bob ALL=(ALL:ALL) !ALL',sudoers)
+        self.assertIn('dave ALL=(ALL:ALL) !ALL',sudoers)
+        self.assertNotIn('delete ',(self.root/'changes').read_text())
+
+    def test_empty_review_logs_make_no_changes(self):
+        for name in ('unauth_users(2).txt','unauth_admins(2).txt','media_files(2).txt'):
+            (self.root/'log'/name).write_text('# All entries preserved\n')
+        original=(self.root/'etc/sudoers').read_text()
+        self.ok(self.run_script('''
+backup_system_paths() { return 91; }
+revoke_local_sudo() { return 92; }
+revoke_local_doas() { return 93; }
+restrict_polkit_admins() { return 94; }
+account_cleanup
+media_cleanup
+'''))
+        self.assertFalse((self.root/'changes').exists())
+        self.assertEqual((self.root/'etc/sudoers').read_text(),original)
+
+    def test_new_unlogged_accounts_and_media_are_preserved(self):
+        listed=self.root/'media/remove.mp3';listed.write_bytes(b'remove')
+        kept=self.root/'media/keep.mp3';kept.write_bytes(b'keep')
+        self.ok(self.run_script('account_review; media_review'))
+        with (self.root/'passwd').open('a') as f:f.write('newuser:*:1004:1004::/home/newuser:/bin/sh\n')
+        unlogged=self.root/'media/new.mp3';unlogged.write_bytes(b'new')
+        report=self.root/'log/media_files(2).txt'
+        report.write_text('\n'.join('# '+line if line.endswith('/keep.mp3') else line
+                                    for line in report.read_text().splitlines())+'\n')
+        self.ok(self.run_script('''
+account_review() { return 91; }
+media_review() { return 92; }
+account_cleanup
+media_cleanup
+'''))
+        self.assertIn('newuser:',(self.root/'passwd').read_text())
+        self.assertFalse(listed.exists())
+        self.assertTrue(kept.exists())
+        self.assertTrue(unlogged.exists())
+
     def test_symlink_media_is_not_followed(self):
         media=self.root/'media/test.mp3';media.write_bytes(b'music')
         self.ok(self.run_script('media_review'))
