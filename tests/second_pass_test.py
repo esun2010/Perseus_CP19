@@ -142,6 +142,7 @@ fi
         self.assertFalse((self.root/'log/unauth_users(2).txt').exists())
 
     def test_second_launcher_requires_reviews_and_stops_on_task_failure(self):
+        (self.root/'service_helpers/distribution.sh').write_text('load_distribution() { CP_DISTRO=ubuntu; }\n')
         (self.root/'run_all_2.sh').write_text((ROOT/'run_all_2.sh').read_text())
         helper=self.root/'service_helpers/second_pass_accounts.sh'
         with helper.open('a') as f:f.write('\naccount_platform_init() { ACCOUNT_PLATFORM=linux; }\n')

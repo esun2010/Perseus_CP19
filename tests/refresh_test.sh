@@ -3,6 +3,7 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 source "$ROOT/service_helpers/service_common.sh"
 log() { :; }
+load_distribution() { CP_DISTRO=debian; }
 active=yes
 reloadable=yes
 reload_ok=yes
@@ -11,7 +12,7 @@ systemctl() {
     calls+=("$1")
     case "$1" in
         is-active) [[ $active == yes ]] ;;
-        show) echo "$reloadable" ;;
+        show) if [[ "$2" == --property=LoadState ]]; then echo loaded; else echo "$reloadable"; fi ;;
         reload) [[ $reload_ok == yes ]] ;;
         *) return 99 ;;
     esac

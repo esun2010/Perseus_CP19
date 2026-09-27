@@ -1,9 +1,13 @@
 #!/bin/bash
-# Lock the optional local guest account and configure installed LightDM only.
+# Lock the optional guest account and configure the selected display manager.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../logging.sh"
 [[ $(id -u) == 0 ]] || { echo 'Run as root.' >&2; exit 1; }
+source "$SCRIPT_DIR/../service_helpers/distribution.sh"
+source "$SCRIPT_DIR/../service_helpers/login_manager.sh"
+load_distribution || exit 1
+[[ "$CP_DISTRO" != freebsd ]] || { echo "Use platforms/FreeBSD/misc/login.sh on FreeBSD." >&2; exit 1; }
 init_logging
 if id guest >/dev/null 2>&1; then
     backup_account_databases
@@ -12,10 +16,26 @@ if id guest >/dev/null 2>&1; then
     usermod -s /usr/sbin/nologin guest
     log 'Locked local guest account and disabled its login shell; files retained'
 fi
-lightdm_status=$(dpkg-query -W -f='${db:Status-Status}' lightdm 2>/dev/null) || lightdm_status=absent
+# Debian-family display-manager selection is authoritative when available.
+manager=
+if [[ -s /etc/X11/default-display-manager ]]; then
+    IFS= read -r manager < /etc/X11/default-display-manager
+    manager=${manager##*/}
+else
+    # Headless hosts skip configuration. Do not choose arbitrarily among managers.
+    installed=()
+    for candidate in lightdm gdm3 sddm; do
+        status=$(dpkg-query -W -f='${db:Status-Status}' "$candidate" 2>/dev/null) || status=absent
+        [[ "$status" != installed ]] || installed+=("$candidate")
+    done
+    if ((${#installed[@]} > 1)); then
+        log 'FAILED: multiple display managers installed without a default selection'; exit 1
+    fi
+    manager=${installed[0]:-}
+fi
 LIGHTDM_DIR=/etc/lightdm/lightdm.conf.d
 LIGHTDM_CONF="$LIGHTDM_DIR/99-cyberpatriot-guest.conf"
-if [[ "$lightdm_status" == installed ]]; then
+if [[ "$manager" == lightdm ]]; then
     [[ ! -L /etc/lightdm && ! -L "$LIGHTDM_DIR" && ! -L "$LIGHTDM_CONF" ]] || {
         log 'FAILED: unexpected symbolic link in LightDM configuration'; exit 1;
     }
@@ -66,7 +86,9 @@ if [[ "$lightdm_status" == installed ]]; then
     audit_file_change "$LIGHTDM_CONF" write_lightdm_guest_policy
     log 'Disabled LightDM guest sessions; saved configuration; active desktop retained'
     log 'Disabled existing local seat-specific guest overrides; review any named-user autologin separately'
+elif [[ -n "$manager" ]]; then
+    configure_other_login_manager "$manager"
 else
-    log 'LightDM is not installed; graphical-login configuration skipped'
+    log 'No supported display manager installed; graphical-login configuration skipped'
 fi
 log 'Guest-login hardening complete; use services/ssh.sh for SSH policy'

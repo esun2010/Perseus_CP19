@@ -1,3 +1,31 @@
+# Combined Linux and FreeBSD toolkit
+
+The FreeBSD project is bundled under `platforms/FreeBSD`; this repository now
+contains both implementations. No separate checkout is required.
+
+Edit `input/distribution.txt`: uncomment exactly one of `ubuntu`, `debian`, `mint`,
+`freebsd`, or leave `auto` selected. The selection must match the running OS.
+Run the top-level `run_all.sh` and `run_all_2.sh` using Bash on either platform.
+On a FreeBSD installation without Bash, run `sh bootstrap.sh` from a root shell;
+it backs up configuration before installing prerequisites.
+
+| Selected platform | Inputs to review | Logs and second-pass review files |
+| --- | --- | --- |
+| Ubuntu / Debian / Mint | `input/` | `log/` and `all_logs*.txt` |
+| FreeBSD | `platforms/FreeBSD/input/` | `platforms/FreeBSD/log/` and `platforms/FreeBSD/all_logs*.txt` |
+
+The distribution selector is always the top-level `input/distribution.txt` when
+using the shared launchers. Native inputs were copied intact from the FreeBSD
+project, including its PF critical-service setting; review its account allowlists
+before running. Direct scripts under `platforms/FreeBSD` are native entry points
+and perform their own FreeBSD checks. Native services use `pkg`, rc services and
+PF, with reload-only behavior. Linux retains APT, systemd and UFW.
+
+See [FreeBSD instructions](platforms/FreeBSD/README.md) for native details. Paths
+in those instructions are relative to `platforms/FreeBSD`. Runtime logs, launcher
+state and Git metadata from the original FreeBSD checkout were not imported.
+The original checkout remains unchanged; future edits to it are not synchronized.
+
 # Description
 This is a set of scripts to run for CyberPatriot Linux
 
@@ -103,7 +131,7 @@ Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
 | File | Description |
 | --- | --- |
 | `misc/kernel.sh` | Applies persistent and runtime sysctl hardening for networking and kernel protections. It also adjusts `/tmp` and `/dev/shm` permissions and mount options, including their existing fstab entries. |
-| `misc/login.sh` | Locks the optional guest account and disables its shell. Configures guest protection only if LightDM is installed, without restarting the active desktop. SSH policy remains in `services/ssh.sh`. |
+| `misc/login.sh` | Locks the optional guest account and disables its shell. Detects the selected LightDM, GDM or SDDM manager and saves login protection without restarting the active desktop. SSH policy remains in `services/ssh.sh`. |
 | `misc/file_permissions.sh` | Sets permissions on selected system files, directories, and user home directories. It also generates a report of world-writable files and directories. |
 | `password_management/pwd_policy.sh` | Sets password-aging defaults in `/etc/login.defs` and a minimum password length of 12 in `/etc/security/pwquality.conf`. It installs libpam-pwquality if needed and enables the packaged PAM profile without forcing replacement of custom PAM stacks. |
 | `password_management/reset_admin_pwd.sh` | Reads `auth_admins.txt` and resets each existing listed account to the script's `NEW_PASSWORD` value, currently `ChangeMe123!`. Edit that value before running if a different password is required. |
@@ -333,7 +361,7 @@ Each managed service has a script under `services/`; `mariadb.sh` and `smb.sh` a
 
 Ubuntu scans `/etc`, `/var/lib/dpkg`, `/var/lib/apt` and `/var/cache/apt` for immutable/append-only flags. It backs up affected paths, records original flags in the backup, then clears the flags. It also repairs the default login PATH in `/etc/environment`, preserving other variables. Individual shell startup files can still override PATH and need manual review. FreeBSD performs the native flag repair in `/etc`, `/usr/local/etc` and `/var/db/pkg`; securelevel restrictions may require single-user repair. Neither implementation clears flags across the whole filesystem.
 
-Healthy APT sources are left alone. Recognized malformed-source, conflicting-signature or repository-signature/release errors trigger an official Ubuntu source candidate for the detected release and architecture. The candidate must pass signature-checked updates before live sources are backed up and disabled under `.disabled-cp-*` filenames. Third-party definitions remain recoverable but need review before reenabling. A failed final update restores original source definitions. Network, clock, lock, storage, missing-keyring and unsupported/EOL-release problems stop with an explanation instead of bypassing authentication. FreeBSD has no APT: it refreshes native `pkg` metadata and preserves custom repository definitions, stopping on failures.
+Healthy APT sources are left alone. Recognized malformed-source, conflicting-signature or repository-signature/release errors trigger an official source candidate for the selected and verified Ubuntu, Debian or Mint release and architecture. The candidate must pass signature-checked updates before live sources are backed up and disabled under `.disabled-cp-*` filenames. Third-party definitions remain recoverable but need review before reenabling. A failed final update restores original source definitions. Network, clock, lock, storage, missing-keyring and unsupported/EOL-release problems stop with an explanation instead of bypassing authentication. FreeBSD has no APT: it refreshes native `pkg` metadata and preserves custom repository definitions, stopping on failures.
 
 Run the fixture tests instead of executing hardening scripts on a development workstation. Actual native-host testing remains necessary.
 
@@ -368,3 +396,37 @@ an error instead of claiming the new configuration is active. Critical services
 remain enabled at boot. Noncritical services are still stopped and disabled.
 Package installers may run their own service hooks; this policy covers explicit
 service actions in these scripts, not arbitrary third-party package hooks.
+
+### Distribution input
+
+Edit `input/distribution.txt` before running. Keep exactly one uncommented line:
+`ubuntu`, `debian`, `mint`, `freebsd`, or the default `auto`. Explicit selections must match
+`/etc/os-release`; a mismatch stops before launcher repairs. Mint uses its Ubuntu
+base codename, or identified Debian base metadata for LMDE. Missing or ambiguous
+release metadata stops automatic repair. This does not certify every other
+hardening script for every version of these distributions.
+
+Login hardening follows `/etc/X11/default-display-manager`, falling back to one
+installed supported manager. LightDM gets the guest-session policy; GDM gets
+automatic and timed login disabled in Ubuntu's `custom.conf` or Debian's
+`daemon.conf`; SDDM gets automatic login disabled in its main configuration.
+Unrelated settings and backups are retained. No display manager is restarted.
+Unknown or ambiguous managers require review.
+
+Repository recovery retains healthy sources. Broken sources are replaced only
+after a signature-checked candidate update succeeds. Debian gets Debian archive
+and security sources; Mint gets both its own archive and its detected base sources.
+Trusted archive keyrings must already exist; no trust bypass or release upgrade
+is attempted. Unsupported/EOL suites fail candidate validation and leave sources
+unchanged. Third-party sources remain backed up for manual review.
+
+All three distributions use systemd capability checks for reloads. Installed
+SSH, database and BIND unit aliases are resolved before use. An inactive service,
+missing unit or unsupported/failed reload returns an error; there is no start,
+restart or reboot fallback.
+
+Configuration references: [Debian APT sources](https://wiki.debian.org/SourcesList),
+[Debian GDM](https://manpages.debian.org/bookworm/gdm3/gdm3.8.en.html),
+[Ubuntu GDM package files](https://packages.ubuntu.com/noble/all/gdm3/filelist),
+[SDDM configuration](https://manpages.debian.org/testing/sddm/sddm.conf.5.en.html),
+and [Mint archive components](https://packages.linuxmint.com/list.php?release=una).

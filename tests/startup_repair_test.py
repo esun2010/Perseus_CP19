@@ -24,6 +24,10 @@ class StartupRepairTest(unittest.TestCase):
         for name in ('/var/lib/dpkg','/var/lib/apt','/var/cache/apt','/var/db/pkg','/usr/local'+str(self.etc)):
             text=text.replace(name,str(self.base/'nonexistent'))
         self.helper=self.base/'repair.sh'; self.helper.write_text(text)
+        if not BSD:
+            helper=(ROOT/'service_helpers/distribution.sh').read_text().replace('/etc',str(self.etc)).replace('/usr/share/keyrings/ubuntu-archive-keyring.gpg',str(self.keyring))
+            helper=helper.replace('$root/input/distribution.txt',str(ROOT/'input/distribution.txt'))
+            (self.base/'distribution.sh').write_text(helper)
     def run_script(self, body):
         script='''set -euo pipefail
 source "$HELPER"

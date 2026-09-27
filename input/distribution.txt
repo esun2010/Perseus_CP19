@@ -1,0 +1,7 @@
+# Keep exactly ONE uncommented option. auto detects the installed distribution.
+# Explicit selections must match /etc/os-release; they never convert the OS.
+auto
+# ubuntu
+# debian
+# mint
+# freebsd

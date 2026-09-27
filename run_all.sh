@@ -8,6 +8,11 @@ if (($#)); then
     exit 1
 fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/service_helpers/distribution.sh"
+load_distribution || exit 1
+if [[ "$CP_DISTRO" == freebsd ]]; then
+    exec bash "$SCRIPT_DIR/platforms/FreeBSD/run_all.sh" "$@"
+fi
 source "$SCRIPT_DIR/service_helpers/critical_services.sh"
 load_critical_services "$SCRIPT_DIR/input/critical_services.txt" || exit 1
 

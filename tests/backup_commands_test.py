@@ -23,6 +23,10 @@ class BackupCommandsTest(unittest.TestCase):
             (self.root / 'etc' / name).write_text('original fixture content\n')
         (self.root / 'input/auth_admins.txt').write_text('alice\nbob\n')
         (self.root / 'input/critical_services.txt').write_text('none\n')
+        (self.root/'input/distribution.txt').write_text('auto\n')
+        (self.root/'etc/os-release').write_text('ID=ubuntu\nVERSION_CODENAME=noble\n')
+        for name in ('distribution.sh', 'login_manager.sh'):
+            (self.root/'service_helpers'/name).write_text((ROOT/'service_helpers'/name).read_text().replace('/etc',str(self.root/'etc')))
         # Only these copied files run. All absolute policy paths point into the fixture.
         for name in ('logging.sh', 'service_helpers/service_common.sh', 'service_helpers/permissions.sh',
                      'service_helpers/critical_services.sh', 'service_helpers/managed_firewall.sh', 'service_helpers/managed_platform.sh', 'password_management/reset_admin_pwd.sh', 'misc/login.sh'):
@@ -54,6 +58,7 @@ userdel() { assert_account_backup; }
 pw() {
     case "$1" in usershow) return 0 ;; lock|usermod) assert_account_backup ;; *) return 88 ;; esac
 }
+dpkg-query() { return 1; }
 systemctl() { [[ "$1" != is-active ]]; }
 ''')
         if BSD:

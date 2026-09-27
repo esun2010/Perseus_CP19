@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Sourced by the launcher only after root checks and logging initialization.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/distribution.sh"
 repair_immutable_files() {
     local root path flags listing
     command -v lsattr >/dev/null && command -v chattr >/dev/null || {
@@ -39,7 +40,9 @@ repair_persistent_path() {
 }
 
 repair_apt_repositories() {
-    local output work distro codename arch mirror security file saved timestamp
+    local output work file saved timestamp
+    load_distribution || return 1
+    [[ "$CP_DISTRO" != freebsd ]] || { log "FAILED: use native FreeBSD startup repair"; return 1; }
     local -a originals=() disabled=()
     command -v apt-get >/dev/null || { log 'FAILED: APT is unavailable'; return 1; }
     output=$(mktemp) || return 1
@@ -55,37 +58,12 @@ repair_apt_repositories() {
         log 'FAILED APT update: resolve network, clock, lock or storage error; sources preserved'; return 1
     fi
     rm -f "$output"
-    # Read distribution metadata as data, never source potentially broken shell text.
-    distro=$(sed -n 's/^ID=//p' /etc/os-release | tr -d '"')
-    codename=$(sed -n 's/^VERSION_CODENAME=//p' /etc/os-release | tr -d '"')
-    [[ "$distro" == ubuntu && "$codename" =~ ^[a-z]+$ ]] || {
-        log 'FAILED: automatic APT source recovery requires an identifiable Ubuntu release'; return 1;
-    }
-    [[ -f /usr/share/keyrings/ubuntu-archive-keyring.gpg ]] || {
-        log 'FAILED: Ubuntu archive keyring missing; restore it from trusted installation media'; return 1;
-    }
-    arch=$(dpkg --print-architecture) || return 1
-    case "$arch" in
-        amd64|i386) mirror=http://archive.ubuntu.com/ubuntu; security=http://security.ubuntu.com/ubuntu ;;
-        arm64|armhf|ppc64el|s390x|riscv64) mirror=http://ports.ubuntu.com/ubuntu-ports; security=$mirror ;;
-        *) log "FAILED: unsupported Ubuntu architecture $arch"; return 1 ;;
-    esac
     work=$(mktemp -d) || return 1
     chmod 755 "$work" || return 1
     mkdir -p "$work/lists/partial" "$work/empty" || return 1
-    cat > "$work/repaired.sources" <<SOURCES
-Types: deb
-URIs: $mirror
-Suites: $codename $codename-updates $codename-backports
-Components: main restricted universe multiverse
-Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-
-Types: deb
-URIs: $security
-Suites: $codename-security
-Components: main restricted universe multiverse
-Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-SOURCES
+    write_distribution_sources > "$work/repaired.sources" || {
+        rm -rf "$work"; log 'FAILED generating trusted distribution sources'; return 1;
+    }
     # Validate signature-checked replacement sources before touching live sources.
     if ! apt-get -o APT::Update::Error-Mode=any \
         -o "Dir::Etc::sourcelist=$work/repaired.sources" \
@@ -122,10 +100,12 @@ SOURCES
         done
         log 'FAILED APT source installation/verification; original sources restored'; return 1
     fi
-    log "REPAIRED APT with signed official Ubuntu sources; previous sources retained as .disabled-cp-$timestamp and in $saved. Review third-party sources before restoring."
+    log "REPAIRED APT with signed official $CP_DISTRO sources; previous sources retained as .disabled-cp-$timestamp and in $saved. Review third-party sources before restoring."
 }
 
 startup_repair() {
+    load_distribution || return 1
+    [[ "$CP_DISTRO" != freebsd ]] || { log "FAILED: use native FreeBSD startup repair"; return 1; }
     repair_immutable_files || return 1
     repair_persistent_path || return 1
     repair_apt_repositories || return 1

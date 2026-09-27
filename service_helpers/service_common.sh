@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO_DIR/logging.sh"
+source "$REPO_DIR/service_helpers/distribution.sh"
 source "$REPO_DIR/service_helpers/permissions.sh"
 source "$REPO_DIR/service_helpers/critical_services.sh"
 
@@ -8,6 +9,7 @@ service_init() {
     [[ $(id -u) == 0 ]] || { echo 'Run with sudo.' >&2; exit 1; }
     command -v apt-get >/dev/null || { echo 'Requires Debian/Ubuntu with apt-get.' >&2; exit 1; }
     [[ -d /run/systemd/system ]] || { echo 'Requires a running systemd system.' >&2; exit 1; }
+    load_distribution || exit 1
     init_logging
     trap 'log "FAILED at line $LINENO (exit $?)"' ERR
 }
@@ -21,7 +23,9 @@ install_packages() {
 }
 
 enable_service() {
-    local unit="$1"
+    local unit
+    load_distribution || return 1
+    unit=$(distribution_service_unit "$1") || return 1
     backup_system_paths /etc/systemd/system || return 1
     systemctl enable "$unit" || return 1
     refresh_service "$unit" || return 1
@@ -56,7 +60,9 @@ set_config_values() {
 
 # Never fall back to restarting or starting an inactive daemon.
 refresh_service() {
-    local unit="$1"
+    local unit
+    load_distribution || return 1
+    unit=$(distribution_service_unit "$1") || return 1
     systemctl is-active --quiet "$unit" || { log "PENDING: $unit is inactive; configuration not applied to a running daemon"; return 1; }
     [[ $(systemctl show --property=CanReload --value "$unit") == yes ]] || {
         log "PENDING: $unit does not support configuration reload"; return 1;

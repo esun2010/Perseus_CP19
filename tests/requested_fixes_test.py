@@ -18,12 +18,17 @@ class RequestedFixesTest(unittest.TestCase):
         return subprocess.run(['bash','-c',text],env=env,text=True,capture_output=True)
     def test_lightdm_absent_is_skipped_and_installed_configuration_is_seat_scoped(self):
         (self.root/'misc').mkdir();(self.root/'etc').mkdir()
+        (self.root/'service_helpers').mkdir(); (self.root/'input').mkdir()
+        (self.root/'input/distribution.txt').write_text('auto\n')
+        (self.root/'etc/os-release').write_text('ID=ubuntu\nVERSION_CODENAME=noble\n')
+        for name in ('distribution.sh','login_manager.sh'):
+            (self.root/'service_helpers'/name).write_text((ROOT/'service_helpers'/name).read_text().replace('/etc',str(self.root/'etc')))
         (self.root/'logging.sh').write_text((ROOT/'logging.sh').read_text())
         script=(ROOT/'misc/login.sh').read_text().replace('/etc',str(self.root/'etc')).replace('/var/backups',str(self.root/'legacy-backups'))
         (self.root/'misc/login.sh').write_text(script)
         mocks='''
 id() { if [[ "$1" == -u ]]; then echo 0; else return 1; fi; }
-dpkg-query() { printf '%s' "$LIGHTDM_STATUS"; }
+dpkg-query() { if [[ "${@: -1}" == lightdm ]]; then printf '%s' "$LIGHTDM_STATUS"; else return 1; fi; }
 install() { mkdir -p "${@: -1}"; }
 chown() { :; }
 systemctl() { echo unexpected >> "$FIXTURE/restart"; return 99; }
