@@ -102,6 +102,7 @@ write_world_report() {
 
 # Find world-writable regular files
 find / \
+    \( -path /proc -o -path '/proc/*' -o -path '*/CyberPatriot_Linux_2026' -o -path '*/CyberPatriot_Linux_2026/*' \) -prune -o \
     -type f \
     -perm -0002 \
     -print 2>/dev/null >> "$OUTPUT_FILE"
@@ -116,6 +117,7 @@ find / \
 
 # Find world-writable directories
 find / \
+    \( -path /proc -o -path '/proc/*' -o -path '*/CyberPatriot_Linux_2026' -o -path '*/CyberPatriot_Linux_2026/*' \) -prune -o \
     -type d \
     -perm -0002 \
     -print 2>/dev/null >> "$OUTPUT_FILE"

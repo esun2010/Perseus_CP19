@@ -203,7 +203,7 @@ that a system is clean.
 
 ## Reports, backups, and checks
 
-`all_logs.txt` accumulates timestamped actions, configuration diffs, permission
+`all_logs.txt` accumulates actions, configuration diffs, permission
 changes, and errors at the repository root with mode `0600`. Reports under `log/`
 are overwritten on each corresponding run:
 

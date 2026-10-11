@@ -37,7 +37,7 @@ media_review() {
         signature=$(media_signature "$path") || { rm -f "$inventory" "$temp"; return 1; }
         printf '%s\t%s\n' "$signature" "$path" >> "$temp"
     done < "$inventory"
-    chmod 600 "$temp" && mv "$temp" "$report" || return 1
+    chmod 644 "$temp" && mv "$temp" "$report" || return 1
     rm -f "$inventory"
     log "AUDIT ONLY: media inventory written to $report; no media deleted"
 }

@@ -11,24 +11,40 @@ plain_path() {
 }
 
 secure_login_home() {
-    local home_dir="$1" owner="$2" file
-    [[ -d "$home_dir" && "$home_dir" != / ]] || return 0
+    local home_dir="1"owner="2" file
+    [[ -d "homedir"&&"home_dir" != / ]] || return 0
+
     if ! plain_path "$home_dir"; then
-        log "REVIEW: linked home path left unchanged: $home_dir"; return 1
+        log "REVIEW: linked home path left unchanged: $home_dir"
+        return 1
     fi
     for file in .bash_profile .bashrc .bash_login .profile .zshrc .bash_history; do
-        [[ ! -L "$home_dir/$file" ]] || { log "REVIEW: linked login file $home_dir/$file"; return 1; }
-        secure_path "$home_dir/$file" 600 "$owner" || return 1
+        if [[ -L "homedir/file" ]]; then
+            log "REVIEW: linked login file skipped: homedir/file"
+            continue
+        fi
+        secure_path "homedir/file" 600 "$owner" || return 1
     done
-    [[ -e "$home_dir/.ssh" || -L "$home_dir/.ssh" ]] || return 0
-    plain_path "$home_dir/.ssh" || { log "REVIEW: linked SSH directory $home_dir/.ssh"; return 1; }
-    secure_path "$home_dir/.ssh" 700 "$owner" || return 1
+
+    [[ -e "homedir/.ssh"||-L"home_dir/.ssh" ]] || return 0
+    plain_path "$home_dir/.ssh" || {
+        log "REVIEW: linked SSH directory $home_dir/.ssh"
+        return 1
+    }
+
+    secure_path "homedir/.ssh"700"owner" || return 1
+
     for file in authorized_keys config id_rsa id_ed25519; do
-        [[ ! -L "$home_dir/.ssh/$file" ]] || { log "REVIEW: linked SSH file $home_dir/.ssh/$file"; return 1; }
-        secure_path "$home_dir/.ssh/$file" 600 "$owner" || return 1
+        if [[ -L "homedir/.ssh/file" ]]; then
+            log "REVIEW: linked SSH file skipped: homedir/.ssh/file"
+            continue
+        fi
+        secure_path "homedir/.ssh/file" 600 "$owner" || return 1
     done
-    log "VERIFIED login/SSH file permissions: $home_dir (contents retained, secrets not logged)"
+
+    log "VERIFIED login/SSH file permissions: $home_dir (linked files skipped; contents retained)"
 }
+
 
 secure_local_login_files() {
     local name password uid gid gecos home_dir shell

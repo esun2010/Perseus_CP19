@@ -202,7 +202,7 @@ Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
 | `run_all.sh` | Interactive non-service tasks with saved progress; never selects service scripts. |
 | `run_all_services.sh` | Service keyword selection, critical-list `auto`, separate progress, reconciliation first and UFW last. |
 | `input/critical_services.txt` | Lists the services required by the scenario and any additional firewall ports to allow. Use one service per line, including `ufw` when needed, or `none` when no services are required. |
-| `all_logs.txt` | Stores the shared, accumulating audit log with timestamps and script names. Scripts using the logging helper record configuration changes, permissions, actions, and failures here. |
+| `all_logs.txt` | Stores the shared, accumulating audit log with script names. Scripts using the logging helper record configuration changes, permissions, actions, and failures here. |
 | `logging.sh` | Provides shared functions for logging actions, comparing configuration files before and after edits, and recording permission changes. Other scripts source this helper rather than run it as a task. |
 | `service_helpers/critical_services.sh` | Parses and validates the critical-service list, service aliases, and extra firewall port rules. It treats the text file as data rather than executable shell commands. |
 | `service_helpers/service_common.sh` | Provides shared service prerequisites, package installation, startup checks, configuration backups, restoration, and setting-editing functions. The service scripts source this helper. |
@@ -227,7 +227,7 @@ Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
 | --- | --- |
 | `user_management/user_management.sh` | Reads the authorized-user lists, audits interactive local accounts at every UID, flags extra UID-zero identities, and writes second-pass review reports without changing accounts. |
 | `input/auth_users.txt` | Input list of authorized local usernames, one per line, based on the competition README. Blank lines and lines beginning with `#` are ignored. |
-| `input/auth_admins.txt` | Input list of authorized administrator usernames, one per line. Both the user audit and administrator password-reset script read this file. |
+| `input/auth_admins.txt` | Input list of authorized administrators, with each username on one line and its password on the following line. Readers use the username and ignore the password line. |
 | `log/unauth_users(2).txt` | Output list of audited users absent from `auth_users.txt`. The user audit overwrites this file each time it runs. |
 | `log/unauth_admins(2).txt` | Output list of audited sudo/wheel members absent from `auth_admins.txt`, excluding accounts already reported as unauthorized users. The user audit overwrites this file each time it runs. |
 
@@ -271,7 +271,8 @@ The shared audit log remains at the repository root as `all_logs.txt`.
 ## Sudo and polkit administrator allowlist
 
 Before running `misc/kernel.sh` (or selecting `ker` in the launcher), populate
-`input/auth_admins.txt` with existing administrator usernames, one per line.
+`input/auth_admins.txt` with each existing administrator username followed by
+its password on the next line. Readers ignore the password line.
 Blank lines and full-line comments are allowed. Empty lists, invalid names,
 missing accounts, and non-root names with UID zero stop the script before
 hardening begins. Root remains an administrator for recovery.

@@ -11,7 +11,7 @@ log() {
     message=${message//$'\n'/\\n}
     message=${message//$'\r'/\\r}
     message=${message//$'\t'/\\t}
-    printf '%s [%s] %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$LOG_SCRIPT" "$message" >> "$LOG_FILE" || {
+    printf '%s %s\n' "$LOG_SCRIPT" "$message" >> "$LOG_FILE" || {
         printf 'Cannot append to audit log: %s\n' "$LOG_FILE" >&2
         exit 1
     }
@@ -22,7 +22,7 @@ init_logging() {
         printf 'Refusing unsafe audit log path: %s\n' "$LOG_FILE" >&2; exit 1;
     }
     touch "$LOG_FILE" || { printf 'Cannot open audit log: %s\n' "$LOG_FILE" >&2; exit 1; }
-    chmod 600 "$LOG_FILE" || exit 1
+    chmod 644 "$LOG_FILE" || exit 1
     log "START"
     trap 'audit_status=$?; log "END exit=$audit_status"' EXIT
 }

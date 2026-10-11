@@ -59,7 +59,7 @@ write_world_report() {
     # FreeBSD find never follows symbolic links unless -H or -L is supplied.
     find / \( ! -fstype local -o -path /dev -o -path /proc -o -path /compat -o -name .zfs \) -prune -o \
         \( -type f -o -type d \) -perm -0002 -print >> "$OUTPUT_FILE" 2> "$OUTPUT_FILE.errors" || status=1
-    chmod 600 "$OUTPUT_FILE" "$OUTPUT_FILE.errors" || return 1
+    chmod 644 "$OUTPUT_FILE" "$OUTPUT_FILE.errors" || return 1
     if ((status)); then
         log "WARNING: world-writable scan incomplete; inspect $OUTPUT_FILE.errors"
     fi

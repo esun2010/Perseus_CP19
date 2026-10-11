@@ -15,11 +15,14 @@ load_admin_allowlist() {
     local file="$SCRIPT_DIR/../../../input/auth_admins.txt" line uid
     ADMIN_USERS=()
     [[ -r "$file" ]] || { log "FAILED: cannot read $file"; return 1; }
+    local skip_password=0
     while IFS= read -r line || [[ -n "$line" ]]; do
+        if ((skip_password)); then skip_password=0; continue; fi
         line=${line%$'\r'}
         line="${line#"${line%%[![:space:]]*}"}"
         line="${line%"${line##*[![:space:]]}"}"
         [[ -z "$line" || "$line" == \#* ]] && continue
+        skip_password=1
         [[ "$line" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*[$]?$ ]] || {
             log "FAILED: invalid administrator username: $line"; return 1;
         }

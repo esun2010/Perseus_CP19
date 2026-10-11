@@ -26,15 +26,17 @@ prepare_review_logs() {
 }
 
 read_authorized_list() {
-    local file="$1" line
+    local file="$1" line skip_password=0
     local -n dest="$2"
     [[ -f "$file" && ! -L "$file" ]] || return 1
     while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ "$file" == */auth_admins.txt ]] && ((skip_password)); then skip_password=0; continue; fi
         line=${line%%#*}; line=${line//$'\r'/}
         line="${line#"${line%%[![:space:]]*}"}"; line="${line%"${line##*[![:space:]]}"}"
         [[ -n "$line" ]] || continue
         [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_.-]*\$?$ ]] || { log "FAILED invalid username in $file"; return 1; }
         dest["$line"]=1
+        [[ "$file" == */auth_admins.txt ]] && skip_password=1
     done < "$file"
 }
 
@@ -113,7 +115,7 @@ account_review() {
             ((status)) || printf '%s\t%s\n' "$name" "$uid" >> "$tmp_admins"
         fi
     done <<< "$ACCOUNT_RECORDS"
-    chmod 600 "$tmp_users" "$tmp_admins" || return 1
+    chmod 644 "$tmp_users" "$tmp_admins" || return 1
     mv "$tmp_users" "$users" && mv "$tmp_admins" "$admins" || return 1
     log "AUDIT ONLY: review $users and $admins, then run run_all_2.sh; no accounts changed"
 }

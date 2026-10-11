@@ -14,11 +14,14 @@ AUTH_ADMINS_FILE="$SCRIPT_DIR/../../../input/auth_admins.txt"
 
 # Validate the entire list before changing any password.
 admins=()
+skip_password=0
 while IFS= read -r username || [[ -n "$username" ]]; do
+    if ((skip_password)); then skip_password=0; continue; fi
     username=${username%$'\r'}
     username="${username#"${username%%[![:space:]]*}"}"
     username="${username%"${username##*[![:space:]]}"}"
     [[ -z "$username" || "$username" == \#* ]] && continue
+    skip_password=1
     [[ "$username" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*[$]?$ ]] || {
         log "FAILED: invalid administrator name: $username"; exit 1;
     }

@@ -43,11 +43,14 @@ init_logging
 echo "Resetting passwords for admins listed in $AUTH_ADMINS_FILE ..."
 echo
 
+skip_password=0
 while IFS= read -r line || [[ -n "$line" ]]; do
+  if ((skip_password)); then skip_password=0; continue; fi
   username="$(echo "$line" | xargs)"
 
   [[ -z "$username" ]] && continue
   [[ "$username" =~ ^# ]] && continue
+  skip_password=1
 
   if id "$username" >/dev/null 2>&1; then
     backup_account_databases
