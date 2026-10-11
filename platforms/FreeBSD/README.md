@@ -13,9 +13,8 @@ package. Neither sudo nor GNU coreutils is required to launch the toolkit.
 
 All paths and commands below are relative to the repository root. Clone the
 whole project: this folder is a native backend, not a standalone copy.
-`input/`, `log/`, `all_logs.txt`, all three `run_all*.sh` launchers, account/media
-review, common service policy, and logging are shared with Linux. Changes to
-those root files apply on both platforms. FreeBSD-specific operations stay here.
+`input/`, `log/`, `all_logs.txt`, the general launcher, account/media review,
+and logging are shared with Linux. FreeBSD-specific operations stay here.
 
 ## Start on FreeBSD
 
@@ -23,7 +22,6 @@ those root files apply on both platforms. FreeBSD-specific operations stay here.
 2. Edit these scenario lists first (one entry per line; comments are allowed):
    - `input/auth_users.txt`: authorized local login names.
    - `input/auth_admins.txt`: existing authorized administrator names.
-   - `input/critical_services.txt`: required services and extra firewall ports.
 3. Open a root shell using `su -`, change into the repository root, and run:
 
    ```sh
@@ -36,8 +34,6 @@ Once Bash is installed, run the launcher or an individual task as root with:
 
 ```sh
 /usr/local/bin/bash run_all.sh
-/usr/local/bin/bash run_all_services.sh
-/usr/local/bin/bash services/ssh.sh
 ```
 
 Only `bootstrap.sh` uses base `/bin/sh`. Other `.sh` files use Bash. Helpers are
@@ -55,93 +51,16 @@ upgrade tool; maintain the base system using the method appropriate to your imag
 
 | Keyword | Task |
 | --- | --- |
-| `mal` | Inspect packages, scheduled jobs, startup files, processes, sockets, and temporary files. |
+| `mal` | Scan the filesystem with ClamAV. |
 | `ker` | Configure native sysctl settings, temporary mounts, and administrator policy. |
 | `log` | Disable the local guest account and optional LightDM guest access. |
 | `pol` | Set native passwd PAM quality checks and default login-class password aging. |
 | `usr` | Audit local users and wheel/UID-zero administrators without deleting accounts. |
-| `adm` | Prompt separately to reset each authorized administrator's password. |
 | `mp3` | Inventory MP3/MOV/MP4 files for review; only run_all_2.sh deletes reviewed files. |
-| `pkg` | Review installed packages; remove only after typing `REMOVE`. |
+| `pkg` | Remove installed matches from the fixed package list. |
 | `per` | Apply native file permissions and report world-writable paths. |
 | `sys` | Run the combined native system-component checks described below. |
 
-Service keywords below belong to `run_all_services.sh`:
-
-| Keyword | Task |
-| --- | --- |
-| `ssh` | Configure and enable base-system `sshd`. |
-| `apache2` or `apache24` | Install/configure the `apache24` package and service. |
-| `vsftpd` | Install/configure `vsftpd-ssl` and the `vsftpd` service. |
-| `pf` | Configure the native PF firewall. |
-
-Legacy aliases: `cra` means `mal`, and `ufw` means `pf`. The old
-`services/ufw.sh` filename forwards to PF; it never installs or invokes UFW.
-
-Services run only if listed as critical, even when explicitly selected. Selecting
-a service also selects PF if PF is critical. Selecting PF configures listed
-services first to discover their listener ports. A service failure blocks PF.
-
-Successful general tasks are stored in `.run_all_status.freebsd`, and service
-tasks in `.run_all_services_status.freebsd`, at the repository root. Linux progress in
-`.run_all_status` is ignored. The menu shows `ran`, `not_run`, or `N/a` for unlisted
-services. Explicit selections rerun completed tasks. Failed or cancelled tasks
-remain retryable. Delete `.run_all_status.freebsd` to start a new scenario.
-Other general tasks continue after an individual failure; check the final summary.
-
-## Services and firewall
-
-Example `input/critical_services.txt`:
-
-```text
-ssh
-apache24
-vsftpd
-pf
-allow 8443/tcp
-allow 5000:5010/udp
-```
-
-Names are case-insensitive. Aliases include `sshd`, `apache2`, `http`, `httpd`,
-`https`, `vsftp`, `ftp`, and `ufw`. Use `none` when no supported services are
-required, without mixing it with service names. Unknown names and invalid ports
-stop the launcher. Configure other services separately and add their firewall
-ports explicitly. The shared list enables the platform firewall by default; `ufw` selects PF on
-FreeBSD. Edit the list for your scenario.
-
-PF discovers supported live listeners and preserves the current SSH server port
-when `SSH_CONNECTION` is available. It uses deny-incoming/allow-outgoing rules
-with stateful connections, loopback, and IPv4/IPv6 control traffic. It validates
-rules before loading and does not flush connection states. Opening a port does
-not install or configure a service.
-
-Existing nonempty PF configuration not managed by this toolkit is preserved.
-The task writes a private `/etc/pf.cyberpatriot.*` candidate and stops for manual
-integration. Review NAT, VPN, routing, jails, anchors, and custom access rules in
-that case. Linux UFW rules are not automatically translated.
-
-SSH applies global root-login and empty-password restrictions, preserving ports,
-keys, authentication methods, and Match sections. Review Match-specific overrides.
-Apache limits version disclosure and disables TRACE while retaining existing
-sites, content, listeners, and TLS. The `https` alias does not provision TLS.
-Custom SSH `-f` files or Apache profiles/configuration overrides require manual
-configuration; the tasks use the standard configuration paths.
-
-FTP disables anonymous access, permits local accounts, logs transfers, and uses
-passive ports 40000–40100. It preserves upload policy. Explicit FTPS is required
-by default, with a self-signed certificate clients must trust. The FreeBSD
-`vsftpd` rc script requires standalone `listen=YES`, so this task configures an
-IPv4 listener; add a separate IPv6 service configuration when the scenario
-requires it. For a scenario that requires plaintext FTP:
-
-```sh
-env VSFTPD_TLS_REQUIRED=NO /usr/local/bin/bash run_all_services.sh
-```
-
-Filesystem permissions, `/etc/ftpusers`, NAT, and client settings still apply.
-SSH and Apache validate before reload. Failed service startup restores the prior
-configuration and service state; vsftpd uses startup checks because it has no
-configuration-validation-only command.
 
 ## Accounts and hardening
 
@@ -212,7 +131,7 @@ are overwritten on each corresponding run:
 | `unauth_users(2).txt` | Unlisted interactive local accounts. |
 | `unauth_admins(2).txt` | Unlisted wheel/UID-zero administrators, excluding already reported users. |
 | `world_files.txt` | World-writable paths; inspect `.errors` for incomplete scans. |
-| `malware_search.txt` | Inspection transcript, findings, errors, and completion status. |
+| `clamav.txt` | ClamAV scan transcript. |
 
 System-file backups use private directories under `/var/backups/cyberpatriot`.
 Additional authentication and policy rollback copies remain under `/var/backups`. The audit log
@@ -223,7 +142,6 @@ Safe checks (temporary fixtures and mocks; no host hardening):
 
 ```sh
 /usr/local/bin/bash platforms/FreeBSD/tests/regression.sh
-/usr/local/bin/bash platforms/FreeBSD/tests/services_freebsd.sh
 /usr/local/bin/bash platforms/FreeBSD/tests/hardening_freebsd.sh
 /usr/local/bin/bash platforms/FreeBSD/tests/freebsd_audits_test.sh
 /usr/local/bin/bash platforms/FreeBSD/tests/native_freebsd.sh
@@ -285,14 +203,9 @@ bash platforms/FreeBSD/tests/backups_test.sh
 python3 platforms/FreeBSD/tests/backup_commands_test.py
 ```
 
-### Managed service policy
-
-`run_all.sh` runs general tasks only. Use the shared `run_all_services.sh` for
-reconciliation, service configuration, and PF. `RUN_SERVICES` is no longer used.
-
 ### Initial system repairs
 
-`run_all.sh` sets a trusted PATH before its first external command. After validating task selection and root access, it runs `service_helpers/startup_repair.sh` before upgrades or selected general tasks, including on resume. Any failed repair stops subsequent tasks.
+`run_all.sh` sets a trusted PATH before its first external command. After validating task selection and root access, it runs `service_helpers/startup_repair.sh` before upgrades or selected tasks, including on resume. Any failed repair stops subsequent tasks.
 
 Ubuntu scans `/etc`, `/var/lib/dpkg`, `/var/lib/apt` and `/var/cache/apt` for immutable/append-only flags. It backs up affected paths, records original flags in the backup, then clears the flags. It also repairs the default login PATH in `/etc/environment`, preserving other variables. Individual shell startup files can still override PATH and need manual review. FreeBSD performs the native flag repair in `/etc`, `/usr/local/etc` and `/var/db/pkg`; securelevel restrictions may require single-user repair. Neither implementation clears flags across the whole filesystem.
 
@@ -344,7 +257,6 @@ Legacy component keywords also select the entire combined task.
 | `openssl` | Protect existing OpenSSL configuration and private-key permissions; check the selected OpenSSL binary's cipher loading and protect native certificate directories. |
 | `grub` | Protect `/boot/loader.conf`, `loader.conf.local`, `loader.rc` and `loader.conf.d`. If GRUB configurations exist, protect and syntax-check them with `grub-script-check`. No bootloader is installed or regenerated. |
 | `selinux` | Report **not applicable**: FreeBSD does not implement Linux SELinux. Native MAC policy is not configured automatically. |
-| `netfilter` | Snapshot already-loaded PF/IPFW rules instead of invoking Linux Netfilter. Keep rules unchanged; `platforms/FreeBSD/services/pf.sh` remains the firewall policy writer. |
 | `dhclient` | Protect existing native `/etc/dhclient.conf`, enter/exit hooks, and corresponding `/usr/local/etc` files. Preserve hook execute bits, leases and interface settings. |
 
 The `ker` task now always disables both `net.inet.ip.forwarding` and

@@ -76,4 +76,4 @@ if package_installed lightdm; then
 else
     log 'LightDM is not installed; graphical-login configuration skipped'
 fi
-log 'Guest-login hardening complete; use services/ssh.sh for SSH policy'
+log 'Guest-login hardening complete'

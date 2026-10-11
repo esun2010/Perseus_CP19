@@ -11,8 +11,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/service_helpers/distribution.sh"
 load_distribution || exit 1
 source "$SCRIPT_DIR/service_helpers/task_paths.sh"
-# Non-service tasks only. Service tasks live in run_all_services.sh.
-ORDER=(mal ker log pol usr adm mp3 pkg per sys)
+# CyberPatriot scoring tasks.
+ORDER=(mal ker log pol usr mp3 pkg per sys)
 declare -A SCRIPT_MAP=(
     [sys]=misc/system_hardening.sh
 
@@ -20,10 +20,9 @@ declare -A SCRIPT_MAP=(
     [log]=misc/login.sh
     [pol]=password_management/pwd_policy.sh
     [usr]=user_management/user_management.sh
-    [adm]=password_management/reset_admin_pwd.sh
     [mp3]=rm_stuff/rm_mp3+.sh
     [pkg]=rm_stuff/bad_pkg.sh
-    [mal]=rm_stuff/malware_search.sh
+    [mal]=rm_stuff/clamav.sh
     [per]=misc/file_permissions.sh
 )
 declare -A DESCRIPTION=(
@@ -33,10 +32,9 @@ declare -A DESCRIPTION=(
     [log]='Guest login settings'
     [pol]='Password policy'
     [usr]='Audit users/admins for second-pass cleanup'
-    [adm]='Reset administrator passwords'
     [mp3]='Inventory media for second-pass removal (no deletion)'
-    [pkg]='Review and remove packages'
-    [mal]='Scan malware, cracking tools, cron and backdoors'
+    [pkg]='Remove listed packages'
+    [mal]='Scan files with ClamAV'
     [per]='File permissions'
 )
 resolve_task_paths
@@ -93,7 +91,6 @@ if ((${#INPUT[@]} == 0)); then
     done
 fi
 for key in "${INPUT[@]}"; do
-    [[ "$key" != cra ]] || key=mal # Backward-compatible selection alias.
     case "$key" in system_hardening|nss|openssl|grub|selinux|netfilter|iptables|dhclient) key=sys ;; esac
     case "$key" in
         auto|all)
@@ -150,15 +147,15 @@ else
         log "FAILED sudo apt upgrade (exit $status)"
         exit "$status"
     fi
-    # Install only standard inspection utilities; never install suspect tools.
+    # Install ClamAV when the scan is selected.
     if [[ -n "${SELECTED[mal]:-}" ]]; then
         unset 'COMPLETED[mal]'
         TASK_STATUS[mal]=not_run
         save_status || { echo "Cannot save task status to $STATE_FILE" >&2; exit 1; }
-        log 'Ensuring malware scan dependencies: procps iproute2 file findutils grep sed coreutils'
+        log 'Ensuring ClamAV is installed'
         backup_package_configuration || exit 1
-        if ! apt-get install -y procps iproute2 file findutils grep sed coreutils; then
-            log 'FAILED installing malware scan dependencies'
+        if ! apt-get install -y clamav; then
+            log 'FAILED installing ClamAV'
             exit 1
         fi
     fi

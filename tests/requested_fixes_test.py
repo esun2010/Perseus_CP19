@@ -85,10 +85,7 @@ configure_native_service openvpn
         self.assertIn('enable openvpn-client@competition',calls)
     def test_package_cleanup_uses_exact_installed_status(self):
         for name in ('rm_stuff','service_helpers','input'):(self.root/name).mkdir()
-        for name in ('critical_services.sh','managed_platform.sh'):
-            (self.root/'service_helpers'/name).write_text((ROOT/'service_helpers'/name).read_text())
-        (self.root/'logging.sh').write_text('backup_package_configuration() { :; }\n')
-        (self.root/'input/critical_services.txt').write_text('none\n')
+        (self.root/'logging.sh').write_text('log() { :; }\n')
         (self.root/'rm_stuff/bad_pkg.sh').write_text((ROOT/'rm_stuff/bad_pkg.sh').read_text().replace('$EUID -ne 0','0 -ne 0'))
         (self.root/'mocks.sh').write_text('''
 dpkg() { echo unexpected >> "$FIXTURE/dpkg-used"; return 99; }
@@ -96,9 +93,9 @@ dpkg-query() { if [[ "${@: -1}" == nmap ]]; then echo installed; else echo confi
 apt-get() { :; }
 apt() { printf '%s\\n' "$*" >> "$FIXTURE/purges"; }
 ''')
-        result=self.run_bash('printf "n\\ny\\n" | bash "$FIXTURE/rm_stuff/bad_pkg.sh"',BASH_ENV=str(self.root/'mocks.sh'))
+        result=self.run_bash('bash "$FIXTURE/rm_stuff/bad_pkg.sh"',BASH_ENV=str(self.root/'mocks.sh'))
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
-        self.assertEqual((self.root/'purges').read_text(),'purge -y nmap\n')
+        self.assertEqual((self.root/'purges').read_text(),'purge -y -- nmap\n')
         self.assertFalse((self.root/'dpkg-used').exists())
 
 if __name__=='__main__':unittest.main(verbosity=2)

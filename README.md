@@ -1,53 +1,17 @@
 # Combined Linux and FreeBSD toolkit
 
-## Additional Linux system components and services
+## Additional Linux system components
 
-The two launchers expose the following tasks. Run the normal launcher for
-non-service components and the service launcher for service configuration.
-Startup repairs belong to the normal launcher; reconciliation belongs to the
-service launcher. The service additions target Linux Debian/Ubuntu/Mint. Native equivalents of
-the six non-service components and system hardening are also available in
-`platforms/FreeBSD`; see its README for the platform-specific behavior.
+The scoring launcher exposes general system tasks and startup repairs. Native
+equivalents of the system components and hardening are also available in
+`platforms/FreeBSD`; see its README for platform-specific behavior.
 
 | Folder | Tasks / scripts | Behavior |
 | --- | --- | --- |
-| `services/` | `sssd.sh`, `dhcpd.sh`, `nfs-server.sh`, `avahi.sh`, `cupsd.sh`, `snmpd.sh` | Check existing scenario-specific services when listed in `input/critical_services.txt`. |
-| `services/extended/` | `fail2ban.sh`, `chrony.sh`, `ntpd.sh`, `rsyslog.sh`, `acpid.sh`, `smartd.sh` | Check installed, active general system/security services without requiring a critical-list entry. Hardware support remains optional on machines that do not use it. |
-| `services/` | Existing `ssh.sh` | OpenSSH server hardening; select `ssh` or its `openssh` alias. |
-
-`run_all.sh` contains only non-service tasks. Service selection lives in
-`run_all_services.sh`, including `services/extended/`. There is no Linux
-`RUN_SERVICES` toggle to turn services back on in the normal launcher.
 Select `sys` for the combined Linux component checks (legacy `netfilter` and
 `iptables` selections also run the combined task), `nfs` (alias `nfs-server`), `cups` (alias
 `cupsd`), `chrony` (aliases `chronyd` and `crony`), or the other listed task names.
 Scripts may also be run individually with `sudo bash path/to/script.sh`.
-
-The new service scripts do not install packages, start inactive daemons, alter
-boot enablement, or replace scenario-specific settings. Unlisted new role
-services are preserved rather than automatically disabled; in particular, SSSD
-may be essential for domain logins. Extended services that are absent/inactive
-are logged as skipped. Listing one as critical makes absence/inactivity an error.
-Choose **one** of Chrony and ntpd; the parser rejects both as critical. No time
-provider is installed or replaced automatically.
-
-These are conservative permission-hardening and review scripts, not complete
-service deployments. Native offline checks are used for SSSD, Fail2ban, Chrony,
-ISC DHCP server, CUPS, and rsyslog. Other profiles explicitly log review items
-without claiming a full syntax/security audit. Native validator output is saved
-in root-only backups because it may include secrets. Permissions preserve existing
-daemon owners/groups. Custom configuration locations and includes outside the
-listed standard paths need separate review. SSSD weak TLS/unrestricted access,
-permissive NFS exports, SNMP community access and Avahi reflection produce a
-nonzero result for scenario-specific remediation. Checks are not exhaustive.
-
-SELinux is never enabled blindly: a detected non-enforcing state is reported as
-pending with a nonzero exit; systems without its tools keep their existing LSM.
-GRUB checks do not regenerate the bootloader or set a password. OpenSSL checks do
-not replace certificates, keys, providers, or individual application TLS policy.
-No new firewall ports are opened automatically for DHCP, NFS/RPC, SNMP, printing
-or mDNS. Add only scenario-approved firewall rules; interface/subnet restrictions
-and dynamic RPC ports need additional review.
 
 Validator references: [Chrony `-p`](https://chrony-project.org/doc/4.9/chronyd.html),
 [SSSD configuration checker](https://sssd.io/design-pages/config_check_tool.html),
@@ -55,7 +19,7 @@ and [Netfilter documentation](https://netfilter.org/documentation/).
 
 
 Linux and FreeBSD share the top-level launchers, inputs, logs, account/media
-review, service policy, firewall-rule construction, and configuration auditing.
+review, and general configuration auditing.
 `platforms/FreeBSD/` contains only native implementations, platform documentation,
 and native tests. Shared code is loaded directly; changes do not need to be
 copied into a second project tree.
@@ -64,24 +28,18 @@ Edit `input/distribution.txt`: select exactly one of `ubuntu`, `debian`, `mint`,
 `freebsd`, or `auto`. The selection must match the running OS. On either platform:
 
 - `bash run_all.sh`: general hardening and inventories (`sys` combines component checks).
-- `bash run_all_services.sh`: service policy and configuration; native firewall last.
 - `bash run_all_2.sh`: apply reviewed account and media cleanup.
 
 Run as root. On FreeBSD without Bash, use `sh bootstrap.sh` from the repository
 root; it backs up configuration before installing prerequisites.
 
 Both platforms use **`input/`**, **`log/`**, **`all_logs.txt`**, and
-**`all_logs(2).txt`** at the repository root. The shared critical-service list
-accepts `ufw` or `pf` for the platform firewall: UFW on Linux, PF on FreeBSD.
-Review the shared account allowlists and service list before running.
-FreeBSD progress uses `.run_all_status.freebsd` and
-`.run_all_services_status.freebsd`; Linux progress is kept separately.
+**`all_logs(2).txt`** at the repository root. Review the shared account
+allowlists before running. FreeBSD progress uses `.run_all_status.freebsd`;
+Linux progress is kept separately.
 
-Native `pkg`, rc, OpenPAM, sysctl, boot, and service configuration code remains in
-`platforms/FreeBSD/`. Identical service entry points and policy helpers live only
-at the root; they load the appropriate native backend. Unsupported FreeBSD
-service selections stop before any changes. Linux-specific extended services
-are not offered on FreeBSD.
+Native `pkg`, rc, OpenPAM, sysctl, and boot code remains in
+`platforms/FreeBSD/`.
 
 See [FreeBSD instructions](platforms/FreeBSD/README.md). All commands there are
 relative to the repository root. The separately checked-out FreeBSD repository
@@ -90,90 +48,32 @@ is independent; this integration applies to the FreeBSD folder in this project.
 # Description
 This is a set of scripts to run for CyberPatriot Linux
 
-changes admin password to ChangeMe123!
+## Local web dashboard
+
+From the repository root, run `./setup.sh`. This single command creates or
+reuses the project `.venv`, installs or updates the website dependencies from
+`requirements.txt`, and starts the dashboard in the foreground. It
+does not run APT updates or CyberPatriot setup tasks. Enter your sudo password
+when prompted so the existing scripts can run with their required privileges. Open
+<http://127.0.0.1:5000> in a browser; press Ctrl+C in the terminal to stop the
+server. The dashboard runs with elevated privileges so its script buttons can
+perform their intended local practice operations.
+
+The UI reads and writes the original files in `input/` and the package list in
+`rm_stuff/bad_pkg.sh`. It stores dashboard status in `.webapp_state.json` and
+per-run output under `log/webapp-runs/`; both are ignored by Git. Configuration
+buttons appear after the app observes a changed file during a dashboard-launched
+run. The interface is intended for local practice and should remain bound to
+localhost.
 
 ALL NEW COMMENTS GO DOWN HERE(do not edit or change anything above):
 
-Service setup requires Debian/Ubuntu (including compatible Mint versions),
-`apt-get`, and a running systemd system. Run scripts with `sudo bash`.
+Run `sudo bash run_all.sh` to select CyberPatriot tasks. `auto` runs every
+listed task; Enter resumes unfinished tasks. Package removal uses its fixed list
+without prompting. Select `mal` to install ClamAV and scan the filesystem; the
+transcript is saved to `log/clamav.txt`.
 
-Edit `input/critical_services.txt` using the competition README. Remove `none` and
-list the required services, one per line: `ssh`, `apache2`, `vsftpd`, and/or `ufw`.
-Aliases such as `sshd`, `http`, and `vsftp` work too. Keep `none` if none are
-required. Installed software is not automatically treated as authorized.
-For other required services, configure them separately and add firewall entries
-such as `allow 3306/tcp` or `allow 5000:5010/udp`. Unknown names and invalid ports
-stop the launcher before any scripts run.
-
-```bash
-sudo bash run_all.sh
-```
-
-The normal launcher accepts interactive non-service keywords, `auto` (all scripts), or Enter to
-resume unfinished tasks. It never selects service scripts or reconciliation,
-even if `RUN_SERVICES=1` is present in the environment. Package upgrades and general system hardening remain
-part of the normal launcher.
-
-For services on either platform, use the separate launcher:
-
-```bash
-sudo bash run_all_services.sh
-```
-
-Both launchers show the same `ran` / `not_run` status format. The service launcher
-also shows `N/a` for unlisted role services. Enter service keywords, `all` for all
-eligible services, `auto` for only the entries in
-`input/critical_services.txt`, or Enter to resume unfinished eligible services.
-Both launchers prompt for selection and reject command-line arguments. `auto`
-reruns critical services even if they previously completed. Extended services
-are included in `auto` only when listed as critical; manual selection and
-`all` can include them without a critical entry. Role services, including SSH
-and UFW, still require a critical-list entry even when selected manually.
-
-Enter `ssh rsyslog`, for example, at the service prompt. `all` remains an alias
-for all non-service scripts in the normal launcher; `auto_run` remains a legacy
-alias for `auto` at the service prompt.
-
-Service reconciliation runs first, including when the critical list is `none`.
-It can disable unlisted managed services according to the policy below.
-Selecting a critical service also selects UFW if UFW is critical; UFW selection
-includes the critical services needed for listener discovery. UFW runs last and
-is skipped if a preceding service fails. CMS selections include their listed
-web/database dependencies. The service launcher does not run the normal
-launcher's system repairs or blanket package upgrade; individual service scripts
-retain their own package and configuration behavior. It currently targets Linux;
-The same service launcher selects native FreeBSD implementations and PF when running on FreeBSD.
-
-Progress is stored separately in `.run_all_status` and
-`.run_all_services_status`, both ignored by Git. A rerun clears previous success
-before starting so failure/interruption leaves that task retryable. Delete the
-corresponding file to reset progress. Non-service `all` still includes
-account/password changes, package removal and media inventory, with their
-existing prompts.
-
-- SSH installs OpenSSH, prohibits root and empty-password login globally, limits
-  authentication attempts, validates configuration, and starts/enables SSH at
-  boot. Existing ports, authentication methods, keys and Match rules remain;
-  review Match-specific exceptions for the scenario.
-- Apache installs Apache2, limits server-version disclosure, disables TRACE,
-  validates configuration, and starts/enables it at boot. Existing virtual
-  hosts, content, ports and TLS remain. HTTPS requires an existing TLS site and
-  certificate; opening a firewall port alone does not configure HTTPS.
-- vsftpd installs the FTP server, disables anonymous access, enables local
-  accounts and transfer logging, and sets passive ports to 40000–40100. It
-  preserves the local upload policy (a fresh install is read-only). Explicit
-  FTPS is required by default, using a generated self-signed certificate that
-  clients must trust. For a scenario requiring plaintext FTP, use
-  `sudo env VSFTPD_TLS_REQUIRED=NO bash run_all_services.sh`, then select `vsftpd` or `all`. Existing filesystem
-  permissions, account restrictions and NAT forwarding still apply.
-- UFW installs/enables the firewall and boot startup, allows required ports
-  before enabling deny-incoming/allow-outgoing defaults, and preserves existing
-  rules. It discovers SSH ports (including active socket activation), active
-  Apache listeners, and vsftpd control/passive ports. It also preserves the
-  current SSH connection port when `SSH_CONNECTION` is available. Existing
-  unrelated allow rules are retained and should be reviewed.
-
-The launcher, service scripts, `misc` scripts and media-removal script append to
+The launcher, `misc` scripts and media-removal script append to
 the root `all_logs.txt`, regardless of the working directory. Configuration
 edits include old/new lines; service state, backups, permissions, firewall
 status and failures are logged. SSH/Apache validate before reloading and restore
@@ -199,13 +99,9 @@ Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
 | --- | --- |
 | `README.md` | Explains how to select tasks, configure critical services, run checks, and understand the project files. |
 | `.gitattributes` | Tells Git to use Linux-style LF line endings for shell scripts. |
-| `run_all.sh` | Interactive non-service tasks with saved progress; never selects service scripts. |
-| `run_all_services.sh` | Service keyword selection, critical-list `auto`, separate progress, reconciliation first and UFW last. |
-| `input/critical_services.txt` | Lists the services required by the scenario and any additional firewall ports to allow. Use one service per line, including `ufw` when needed, or `none` when no services are required. |
+| `run_all.sh` | Interactive CyberPatriot scoring tasks with saved progress. |
 | `all_logs.txt` | Stores the shared, accumulating audit log with script names. Scripts using the logging helper record configuration changes, permissions, actions, and failures here. |
 | `logging.sh` | Provides shared functions for logging actions, comparing configuration files before and after edits, and recording permission changes. Other scripts source this helper rather than run it as a task. |
-| `service_helpers/critical_services.sh` | Parses and validates the critical-service list, service aliases, and extra firewall port rules. It treats the text file as data rather than executable shell commands. |
-| `service_helpers/service_common.sh` | Provides shared service prerequisites, package installation, startup checks, configuration backups, restoration, and setting-editing functions. The service scripts source this helper. |
 
 ### General hardening and removal scripts
 
@@ -213,13 +109,11 @@ Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
 | --- | --- |
 | `misc/system_hardening.sh` | Runs NSS, OpenSSL, GRUB, SELinux, Netfilter snapshot, and DHCP client checks together (`sys` in the launcher). |
 | `misc/kernel.sh` | Applies persistent and runtime sysctl hardening for networking and kernel protections. It also adjusts `/tmp` and `/dev/shm` permissions and mount options, including their existing fstab entries. |
-| `misc/login.sh` | Locks the optional guest account and disables its shell. Detects the selected LightDM, GDM or SDDM manager and saves login protection without restarting the active desktop. SSH policy remains in `services/ssh.sh`. |
 | `misc/file_permissions.sh` | Sets permissions on selected system files, directories, and user home directories. It also generates a report of world-writable files and directories. |
 | `password_management/pwd_policy.sh` | Creates/configures `login.defs`, `pwquality.conf` and `faillock.conf` for account defaults, password complexity and failed-login lockout. Enables and verifies PAM profiles, preserving backups and refusing incompatible custom stacks. |
-| `password_management/reset_admin_pwd.sh` | Reads `auth_admins.txt` and resets each existing listed account to the script's `NEW_PASSWORD` value, currently `ChangeMe123!`. Edit that value before running if a different password is required. |
 | `rm_stuff/rm_mp3+.sh` | Writes a read-only MP3/MOV/MP4 inventory to `log/media_files(2).txt`; reviewed removal is performed by `rm_stuff/rm_mp3+_2.sh` in the second launcher. |
-| `rm_stuff/bad_pkg.sh` | Presents a list of potentially unwanted packages for optional editing and asks for confirmation before purging installed matches. After removal, it runs package autoremove. |
-| `rm_stuff/malware_search.sh` | Scans cracking/remote-access tools and packages, cron/at jobs, startup persistence, processes, listeners, and writable temporary locations. All output and errors go to `log/malware_search.txt`; findings are not removed or executed. |
+| `rm_stuff/bad_pkg.sh` | Removes installed matches from the fixed CyberPatriot package list without prompting. |
+| `rm_stuff/clamav.sh` | Scans the filesystem with ClamAV and writes output to `log/clamav.txt`. |
 
 ### User audit files
 
@@ -231,21 +125,11 @@ Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
 | `log/unauth_users(2).txt` | Output list of audited users absent from `auth_users.txt`. The user audit overwrites this file each time it runs. |
 | `log/unauth_admins(2).txt` | Output list of audited sudo/wheel members absent from `auth_admins.txt`, excluding accounts already reported as unauthorized users. The user audit overwrites this file each time it runs. |
 
-### Service scripts
-
-| File | Description |
-| --- | --- |
-| `services/ssh.sh` | Installs OpenSSH, applies global login restrictions, validates its configuration, and starts/enables SSH at boot. It backs up and restores the main configuration if validation or startup fails. |
-| `services/apache2.sh` | Installs Apache2 and adds a configuration that reduces version disclosure and disables TRACE while retaining existing sites. It validates the configuration, starts/enables Apache at boot, and rolls back its configuration changes on failure. |
-| `services/vsftpd.sh` | Installs vsftpd, disables anonymous access, enables local logins and transfer logging, and configures passive ports 40000–40100. It requires FTPS by default, starts/enables the service at boot, and restores its configuration if startup fails. |
-| `services/ufw.sh` | Installs UFW, discovers required service ports, adds allow rules, and enables the firewall now and at boot. It applies deny-incoming/allow-outgoing defaults while retaining existing rules and supported SSH access ports. |
-
 ### Tests
 
 | File | Description |
 | --- | --- |
 | `tests/logging_test.sh` | Tests configuration-change logs, permission logs, and media-deletion success and failure handling using temporary files and mocked commands. It does not run system hardening. |
-| `tests/services_test.sh` | Tests service-list parsing, interactive task selection, automatic service skipping, rejected command-line modes, and failure handling. It also checks firewall port discovery using temporary fixtures and mocked system commands. |
 
 ### Generated text reports
 
@@ -264,8 +148,7 @@ After selecting eligible tasks, `run_all.sh` runs `sudo apt update` and then
 confirmation prompt. If either command fails, the launcher stops and records
 the failure in `all_logs.txt`.
 
-Edit the scenario input lists in `input/`: `critical_services.txt`,
-`auth_users.txt`, and `auth_admins.txt`. Generated reports are stored in `log/`.
+Edit the scenario input lists in `input/`: `auth_users.txt` and `auth_admins.txt`. Generated reports are stored in `log/`.
 The shared audit log remains at the repository root as `all_logs.txt`.
 
 ## Sudo and polkit administrator allowlist
@@ -384,35 +267,6 @@ Run `python3 tests/auth_permissions_test.py` for temporary-file checks of accoun
 PAM, module, and log permissions, backups, symlink handling, and repeat runs. These tests
 do not change system ownership, configuration, or running services.
 
-## Malware indicator scan
-
-Run `sudo bash rm_stuff/malware_search.sh` directly, or select `mal` in
-`run_all.sh`. The old `cra` selection remains an alias. `all` includes the new
-scan before cleanup tasks. Old `cra` completion records do not mark `mal`
-complete, so resuming will run the replacement scan. The launcher installs
-`procps`, `iproute2`, `file`, `findutils`, `grep`, `sed`, and `coreutils` when
-the scan is selected. It does not install cracking tools or enable cron.
-
-Each run overwrites `log/malware_search.txt` with one transcript containing
-stdout, stderr, findings, and completion status. The report has mode `0600`
-because cron entries and process arguments may contain sensitive information.
-Existing old numbered reports are retained as historical files. The launcher's
-normal start/pass/fail records still go to `all_logs.txt`.
-
-The scan queries installed packages and tool locations, reads system and every
-local user's cron spool plus at jobs, inspects local startup entries, lists
-network listeners, and looks for suspicious process command lines and executable
-paths. It recursively inventories regular files in `/tmp`, `/var/tmp`,
-`/dev/shm`, and `/run/user/<uid>`, including nested or non-executable payloads.
-Text files up to 1 MiB are checked for tool names and backdoor indicators;
-larger and binary files still receive metadata/type reporting. It never runs
-or deletes discovered files. Missing commands and scan errors produce a failed
-status so the launcher can retry. Findings require review: legitimate tools
-and cron jobs can match, and this heuristic scan cannot prove a system clean.
-
-Run `python3 tests/test_malware_search.py` for isolated scanner and launcher
-checks without installing packages, scanning the host, or running hardening.
-
 ## Backups before system changes
 
 Before each configuration edit or regular-file ownership/permission change,
@@ -453,16 +307,6 @@ regression checks use a temporary directory and never harden the host:
 bash tests/backups_test.sh
 python3 tests/backup_commands_test.py
 ```
-
-### Managed service policy
-
-On Linux this policy runs in `run_all_services.sh` or individual managed-service scripts, never in the normal launcher.
-
-Before each service-launcher run (including resume), unlisted BIND9, MySQL/MariaDB, Postfix, Sendmail, Samba, WordPress, Joomla, OpenVPN and Nginx are **disabled, never automatically uninstalled**. Packages, databases and site files remain in place. Review `input/critical_services.txt` against the competition README first. Empty lists are rejected; `none` explicitly disables all managed services. Ubuntu stops, disables and persistently masks systemd units; FreeBSD stops native services, writes boot flags and checks that services are no longer boot-enabled. Custom service names/startup jobs need manual review.
-
-WordPress/Joomla have no separate daemon. Their discovered document roots are backed up and made inaccessible with mode `000`, which survives reboot and blocks ordinary unprivileged web workers. Original modes are saved privately in `/var/lib/cyberpatriot/disabled-sites` and restored when the application becomes critical again. This assumes normal, unprivileged web workers; custom root-running web applications need manual isolation. Overlap with a critical site's root stops the operation. Usual locations are `/var/www`, `/usr/share/wordpress`, `/usr/local/www`; add custom roots in `input/web_apps.txt`. Existing critical CMS configuration is checked only when Apache or Nginx is explicitly critical. No web/database dependency becomes critical implicitly.
-
-Each managed service has a script under `services/`; `mariadb.sh` and `smb.sh` are aliases. Native settings and database engines are preserved. Configuration checks precede enabling services. OpenVPN needs existing scenario-specific profiles and certificates; CMS deployment, database credentials and virtual hosts remain scenario-specific. FreeBSD uses available native packages or logs an unavailable implementation as skipped. Firewalls use actual critical-service listeners. The separate interactive package-removal task still removes packages you explicitly approve.
 
 ### Initial system repairs
 

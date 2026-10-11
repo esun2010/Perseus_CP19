@@ -8,7 +8,6 @@ trap 'rm -rf -- "$work"' EXIT
 mkdir -p "$work/user_management" "$work/rm_stuff" "$work/input" "$work/log" "$work/media"
 printf 'alice\r\n jane  # authorized account\n' > "$work/input/auth_users.txt"
 printf 'alice\n' > "$work/input/auth_admins.txt"
-printf 'ssh\napache24\nvsftpd\npf\n' > "$work/input/critical_services.txt"
 
 (
     source "$ROOT/../../user_management/user_management.sh"
@@ -106,17 +105,4 @@ grep -q -- '-fstype linprocfs' "$work/find-calls"
 grep -q -- '-fstype rdonly' "$work/find-calls"
 grep -q 'FAILED deleting media:' "$work/media-output"
 
-(
-    source "$ROOT/rm_stuff/malware_search.sh"
-    ps() { [[ "$*" == '-axww -o user,pid,ppid,command' ]] || return 1; printf 'root 12 1 nc -l 1234\n'; }
-    sockstat() { [[ "$*" == -46l ]] || return 1; printf 'root sshd 1 4 tcp4 *:22 *:*\n'; }
-    procstat() { [[ "$*" == '-a -b' ]] || return 1; printf '12 demo 1403000 /tmp/demo\n'; }
-    scan_processes
-    ((SCAN_ERRORS == 0))
-    sockstat() { return 1; }
-    scan_processes
-    ((SCAN_ERRORS == 1))
-) > "$work/process-output" 2>&1
-grep -q '/tmp/demo' "$work/process-output"
-grep -q 'INCOMPLETE: socket query failed' "$work/process-output"
-printf 'PASS: FreeBSD account audits, protected-package removal, two-pass media inventory/failure, process scan failures.\n'
+printf 'PASS: FreeBSD account audits, protected-package removal, two-pass media inventory/failure, media inventory and failure handling.\n'

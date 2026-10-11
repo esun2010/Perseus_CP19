@@ -5,7 +5,8 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 TEMP=$(mktemp -d "${TMPDIR:-/tmp}/cyberpatriot-backup-tests.XXXXXX")
 trap 'rm -rf "$TEMP"' EXIT
 export CP_BACKUP_ROOT="$TEMP/backups"
-source "$ROOT/service_helpers/service_common.sh"
+source "$ROOT/logging.sh"
+source "$ROOT/service_helpers/permissions.sh"
 LOG_FILE="$TEMP/audit.log"
 passed=0
 pass() { passed=$((passed + 1)); printf 'PASS %s\n' "$*"; }

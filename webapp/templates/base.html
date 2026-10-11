@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}CyberPatriot Dashboard{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('dashboard') }}">CyberPatriot Scripts</a>
+    <span class="local-tag">Local practice dashboard</span>
+  </header>
+  <main class="page-shell">{% block body %}{% endblock %}</main>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ filename }}{% endblock %}
+{% block body %}
+  <div class="page-heading"><h1>{{ filename }}</h1><p class="file-path">{{ filepath }}</p></div>
+  <section class="panel viewer-panel">
+    {% if error %}<p class="error-banner">Unable to read file: {{ error }}</p>{% else %}<pre class="file-content">{{ content }}</pre>{% endif %}
+    <div class="form-actions"><a class="button secondary" href="{{ url_for('dashboard') }}">Back to Dashboard</a></div>
+  </section>
+{% endblock %}

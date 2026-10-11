@@ -69,7 +69,7 @@ component_main() {
             fi
             if ((found)); then log "SAVED native firewall inspection: $SYSTEM_BACKUP_DIR; rules unchanged"
             else log 'SKIPPED runtime firewall snapshot: neither PF nor IPFW is loaded'; fi
-            log 'Netfilter/iptables are Linux-only; services/pf.sh is the native firewall policy writer' ;;
+            log 'Netfilter/iptables are Linux-only' ;;
         dhclient)
             for file in /etc/dhclient.conf /usr/local/etc/dhclient.conf; do
                 [[ -e "$file" || -L "$file" ]] || continue

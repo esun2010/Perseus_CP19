@@ -95,4 +95,4 @@ elif [[ -n "$manager" ]]; then
 else
     log 'No supported display manager installed; graphical-login configuration skipped'
 fi
-log 'Guest-login hardening complete; use services/ssh.sh for SSH policy'
+log 'Guest-login hardening complete'

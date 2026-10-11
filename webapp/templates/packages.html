@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Edit Bad Packages{% endblock %}
+{% block body %}
+  <div class="page-heading"><h1>Bad Packages</h1><p class="file-path">rm_stuff/bad_pkg.sh · BAD_PACKAGES</p></div>
+  <section class="panel editor-panel">
+    {% if error %}<p class="error-banner">{{ error }}</p>{% endif %}
+    {% if request.args.get('saved') %}<p class="success-banner">Package list saved to rm_stuff/bad_pkg.sh.</p>{% endif %}
+    {% if not error %}<form method="post" action="{{ url_for('save_packages') }}">
+      <label class="editor-label" for="packages">One package name per line</label>
+      <textarea id="packages" name="packages" spellcheck="false">{{ packages|join('\n') }}</textarea>
+      <div class="form-actions"><a class="button secondary" href="{{ url_for('dashboard') }}">Back to Dashboard</a><button class="button save-button" type="submit">Save</button></div>
+    </form>{% else %}<div class="form-actions"><a class="button secondary" href="{{ url_for('dashboard') }}">Back to Dashboard</a></div>{% endif %}
+  </section>
+{% endblock %}

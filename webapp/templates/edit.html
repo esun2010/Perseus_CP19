@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ filename }}{% endblock %}
+{% block body %}
+  <div class="page-heading"><h1>Edit Input File</h1><p class="file-path">{{ filename }} · {{ relpath }}</p></div>
+  <section class="panel editor-panel">
+    {% if error %}<p class="error-banner">Could not read this file: {{ error }}</p>{% endif %}
+    {% if request.args.get('saved') %}<p class="success-banner">Saved to the original input file.</p>{% endif %}
+    {% if not error %}<form method="post" action="{{ url_for('save_input', relpath=relpath) }}">
+      <label class="editor-label" for="contents">{{ filename }}</label>
+      <textarea id="contents" name="contents" spellcheck="false">{{ contents }}</textarea>
+      <div class="form-actions"><a class="button secondary" href="{{ url_for('dashboard') }}">Back to Dashboard</a><button class="button save-button" type="submit">Save</button></div>
+    </form>{% endif %}
+    {% if error %}<div class="form-actions"><a class="button secondary" href="{{ url_for('dashboard') }}">Back to Dashboard</a></div>{% endif %}
+  </section>
+{% endblock %}

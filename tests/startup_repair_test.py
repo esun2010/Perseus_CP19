@@ -103,21 +103,5 @@ repair_immutable_files
         self.assertNotEqual(result.returncode,0)
         self.assertFalse((self.base/'later').exists())
 
-    def test_cms_disable_retains_files_and_restores_mode(self):
-        source=(ROOT/'service_helpers/managed_services.sh').read_text()
-        start=source.index('set_site_enabled() {')
-        end=source.index('\nreconcile_managed_services()',start)
-        helper=self.base/'site-helper.sh'
-        helper.write_text(source[start:end].replace('/var/lib/cyberpatriot/disabled-sites',str(self.base/'state')))
-        site=self.base/'site'; site.mkdir(); site.chmod(0o750)
-        (site/'content.php').write_text('retained')
-        result=self.run_script('source "'+str(helper)+'"; MANAGED_PLATFORM=linux; '
-            'set_site_enabled "'+str(site)+'" no; '
-            '[[ "$(stat -c %a "'+str(site)+'")" == 0 ]]; '
-            'set_site_enabled "'+str(site)+'" no; '
-            'set_site_enabled "'+str(site)+'" yes')
-        self.assertEqual(result.returncode,0,result.stderr)
-        self.assertEqual(site.stat().st_mode & 0o777,0o750)
-        self.assertEqual((site/'content.php').read_text(),'retained')
 
 if __name__=='__main__': unittest.main(verbosity=2)

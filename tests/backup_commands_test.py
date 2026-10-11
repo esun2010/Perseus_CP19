@@ -15,21 +15,19 @@ class BackupCommandsTest(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix='cp-backup-commands-')
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        for name in ('input', 'misc', 'services', 'password_management', 'service_helpers',
+        for name in ('input', 'misc', 'password_management', 'service_helpers',
                      'etc/lightdm', 'etc/security', 'etc/ufw', 'etc/default', 'etc/systemd/system'):
             (self.root / name).mkdir(parents=True, exist_ok=True)
         for name in ('passwd', 'shadow', 'master.passwd', 'group', 'gshadow', 'pwd.db', 'spwd.db',
                      'subuid', 'subgid', 'security/opasswd', 'lightdm/lightdm.conf', 'ufw/user.rules', 'default/ufw'):
             (self.root / 'etc' / name).write_text('original fixture content\n')
         (self.root / 'input/auth_admins.txt').write_text('alice\nbob\n')
-        (self.root / 'input/critical_services.txt').write_text('none\n')
         (self.root/'input/distribution.txt').write_text('auto\n')
         (self.root/'etc/os-release').write_text('ID=ubuntu\nVERSION_CODENAME=noble\n')
         for name in ('distribution.sh', 'login_manager.sh'):
             (self.root/'service_helpers'/name).write_text((ROOT/'service_helpers'/name).read_text().replace('/etc',str(self.root/'etc')))
         # Only these copied files run. All absolute policy paths point into the fixture.
-        for name in ('logging.sh', 'service_helpers/service_common.sh', 'service_helpers/permissions.sh',
-                     'service_helpers/critical_services.sh', 'service_helpers/managed_firewall.sh', 'service_helpers/managed_platform.sh', 'password_management/reset_admin_pwd.sh', 'misc/login.sh'):
+        for name in ('logging.sh', 'service_helpers/permissions.sh', 'misc/login.sh'):
             text = (ROOT / name).read_text().replace('/etc', str(self.root / 'etc'))
             text = text.replace('$EUID -ne 0', '0 -ne 0')
             text = text.replace('[[ -t 0 && -t 1 ]]', 'true')
@@ -73,18 +71,6 @@ systemctl() { [[ "$1" != is-active ]]; }
         env = dict(self.env, FAIL_BACKUP='yes' if fail_backup else 'no')
         return subprocess.run(['bash', str(self.root / name)], env=env, text=True, capture_output=True)
 
-    def test_password_resets_snapshot_each_change(self):
-        result = self.run_task('password_management/reset_admin_pwd.sh')
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual((self.root / 'calls').read_text().count('account change'), 2)
-        self.assertEqual(len(list((self.root / 'backups').glob('*/COMPLETE'))), 2)
-        self.assertNotIn('original fixture content', (self.root / 'all_logs.txt').read_text())
-
-    def test_password_reset_stops_on_backup_failure(self):
-        result = self.run_task('password_management/reset_admin_pwd.sh', True)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertFalse((self.root / 'calls').exists())
-
     def test_guest_changes_snapshot_each_database_update(self):
         result = self.run_task('misc/login.sh')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -95,29 +81,6 @@ systemctl() { [[ "$1" != is-active ]]; }
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse((self.root / 'calls').exists())
 
-    @unittest.skipIf(BSD, 'UFW is Ubuntu-only; FreeBSD PF has its own fixture suite')
-    def test_ufw_backups_precede_firewall_mutations(self):
-        text = (ROOT / 'services/ufw.sh').read_text().replace('/etc', str(self.root / 'etc'))
-        (self.root / 'services/ufw.sh').write_text(text)
-        with (self.root / 'service_helpers/service_common.sh').open('a') as out:
-            out.write(r'''
-service_init() { :; }
-install_packages() { :; }
-secure_service_permissions() { :; }
-ufw() {
-    if [[ "$1" == status ]]; then printf 'Status: active\n'; return; fi
-    [[ -f "$SYSTEM_BACKUP_DIR/COMPLETE" ]] || return 81
-    cmp "$FIXTURE/etc/ufw/user.rules" "$SYSTEM_BACKUP_DIR/files$FIXTURE/etc/ufw/user.rules" || return 82
-    cmp "$FIXTURE/etc/default/ufw" "$SYSTEM_BACKUP_DIR/files$FIXTURE/etc/default/ufw" || return 83
-    printf 'ufw change\n' >> "$FIXTURE/calls"
-}
-''')
-        result = self.run_task('services/ufw.sh', True)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertFalse((self.root / 'calls').exists())
-        result = self.run_task('services/ufw.sh')
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual((self.root / 'calls').read_text().count('ufw change'), 4)
 
 
 if __name__ == '__main__':

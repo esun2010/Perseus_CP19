@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}CyberPatriot Dashboard{% endblock %}
+{% block body %}
+  <div class="page-heading">
+    <h1>CyberPatriot Dashboard</h1>
+    <p>Run the existing scoring scripts, review their files, and edit scenario inputs.</p>
+  </div>
+
+  <section class="panel update-panel" aria-labelledby="updates-title">
+    <div class="section-heading">
+      <div><span class="section-number">1</span><h2 id="updates-title">Updates and APT Reset</h2></div>
+      <p>{{ update.description }}</p>
+    </div>
+    <div class="script-row" data-script="updates" data-status-url="{{ url_for('status', script='updates') }}">
+      <div class="script-label"><strong>Initial system repair and package update</strong><span>Uses the existing run_all.sh startup repair and update/upgrade steps.</span></div>
+      <div class="run-controls"><span class="status-message" data-status-message>{{ update_status.message or update_status.status }}</span><button class="run-button {{ update_status.status|lower }}" data-run-url="{{ url_for('run_script', script='updates') }}">Run</button></div>
+    </div>
+    <div class="file-actions" data-files-container>
+      {% for file in update_files.logs %}<a class="button file-button" href="{{ url_for('view_file', path=file) }}" target="_blank" rel="noopener">Log: {{ file }}</a>{% endfor %}
+      {% for file in update_files.configs %}<a class="button file-button" href="{{ url_for('view_file', path=file) }}" target="_blank" rel="noopener">Config: {{ file }}</a>{% endfor %}
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="inputs-title">
+    <div class="section-heading"><div><span class="section-number">2</span><h2 id="inputs-title">Input Files</h2></div><p>Original files read by the existing scripts.</p></div>
+    <div class="input-list">
+      {% for file in inputs %}
+      <div class="input-row"><span>{{ file }}</span><a class="button secondary" href="{{ url_for('edit_input', relpath=file) }}">Edit</a></div>
+      {% endfor %}
+    </div>
+  </section>
+
+  {% for task in tasks %}
+  <section class="panel script-panel" aria-labelledby="task-{{ task.id }}">
+    <div class="section-heading"><div><span class="section-number">{{ loop.index + 2 }}</span><h2 id="task-{{ task.id }}">{{ task.name }}</h2></div><span class="script-path">{{ task.script }}</span></div>
+    {% set scripts = [(task.name, task.script, task.status, task.files)] %}
+    {% if task.second %}{% set scripts = scripts + [(task.second.name, task.second.script, task.second.status, task.second_files)] %}{% endif %}
+    {% for script_name, script_path, script_status, script_files in scripts %}
+    <div class="script-entry">
+      <div class="script-row" data-script="{{ script_path }}" data-status-url="{{ url_for('status', script=script_path) }}">
+        <div class="script-label"><strong>{{ script_name }}</strong><span>{{ script_path }}</span></div>
+        <div class="run-controls"><span class="status-message" data-status-message>{{ script_status.message or script_status.status }}</span><button class="run-button {{ script_status.status|lower }}" data-run-url="{{ url_for('run_script', script=script_path) }}">Run</button></div>
+      </div>
+      <div class="file-actions" data-files-container>
+        {% if task.edit_packages and loop.first %}<a class="button secondary" href="{{ url_for('edit_packages') }}">Edit List</a>{% endif %}
+        {% for file in script_files.logs %}<a class="button file-button" href="{{ url_for('view_file', path=file) }}" target="_blank" rel="noopener">Log: {{ file }}</a>{% endfor %}
+        {% for file in script_files.configs %}<a class="button file-button" href="{{ url_for('view_file', path=file) }}" target="_blank" rel="noopener">Config: {{ file }}</a>{% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+  {% endfor %}
+
+  {% for file in aggregate %}
+  <section class="panel aggregate-panel">
+    <div class="section-heading"><div><span class="section-number">{{ tasks|length + loop.index + 2 }}</span><h2>{% if file == 'all_logs.txt' %}Aggregate Log{% else %}Second-pass Aggregate Log{% endif %}</h2></div><span class="script-path">{{ file }}</span></div>
+    <div class="file-actions"><a class="button file-button" href="{{ url_for('view_file', path=file) }}" target="_blank" rel="noopener">View {{ file }}</a></div>
+  </section>
+  {% endfor %}
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='dashboard.js') }}" defer></script>{% endblock %}

@@ -9,6 +9,9 @@
 /all_logs(2).txt
 
 **/__pycache__/
+/.webapp_state.json
+/log/webapp-runs/
+/.venv/
 
 # Separate service launcher progress
 .run_all_services_status

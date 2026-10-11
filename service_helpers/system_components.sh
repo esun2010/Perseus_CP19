@@ -5,8 +5,12 @@ if [[ $(uname -s) == FreeBSD ]]; then
     return $?
 fi
 # Non-daemon Linux components. Source this file; invoke through misc/system_hardening.sh.
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/service_common.sh"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO_DIR/logging.sh"
+source "$REPO_DIR/service_helpers/distribution.sh"
+source "$REPO_DIR/service_helpers/permissions.sh"
 source "$REPO_DIR/service_helpers/path_hardening.sh"
+init_logging
 
 component_config() {
     local file="$1" mode="${2:-644}"
@@ -87,7 +91,7 @@ component_main() {
                 found=1
             fi
             ((found)) || { log 'SKIPPED: no Netfilter inspection utilities installed'; return 0; }
-            log "SAVED IPv4/IPv6 Netfilter rules where available: $SYSTEM_BACKUP_DIR; use services/ufw.sh to apply firewall policy" ;;
+            log "SAVED IPv4/IPv6 Netfilter rules where available: $SYSTEM_BACKUP_DIR" ;;
         dhclient)
             [[ -f /etc/dhcp/dhclient.conf ]] || { log 'SKIPPED: ISC DHCP client config absent (NetworkManager/networkd may manage DHCP)'; return 0; }
             component_config /etc/dhcp/dhclient.conf || return 1
@@ -100,4 +104,9 @@ component_main() {
     esac
 }
 
-component_init() { service_init; }
+component_init() {
+    [[ $(id -u) == 0 ]] || { echo 'Run with sudo.' >&2; return 1; }
+    command -v apt-get >/dev/null || { echo 'Requires Debian/Ubuntu with apt-get.' >&2; return 1; }
+    load_distribution || return 1
+    init_logging
+}
