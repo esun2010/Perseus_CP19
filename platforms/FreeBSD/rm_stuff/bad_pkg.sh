@@ -4,7 +4,7 @@ set -euo pipefail
 export LC_ALL=C
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../service_helpers/platform.sh"
-source "$SCRIPT_DIR/../../../logging.sh"
+source "$SCRIPT_DIR/../../../main/logging.sh"
 
 
 main() {

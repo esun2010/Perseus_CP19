@@ -5,7 +5,7 @@ if [[ "${BASH_SOURCE[0]}" == "$0" && $(uname -s) == FreeBSD ]]; then
 fi
 set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../logging.sh"
+source "$SCRIPT_DIR/../main/logging.sh"
 source "$SCRIPT_DIR/../service_helpers/permissions.sh"
 [[ $EUID == 0 ]] || { echo 'Run this script as root.' >&2; exit 1; }
 init_logging

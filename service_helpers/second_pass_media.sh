@@ -28,7 +28,7 @@ media_review() {
     fi
     local temp
     temp=$(mktemp "$report.XXXXXX") || return 1
-    printf '# First-pass media inventory for run_all_2.sh. NO FILES DELETED.\n# Format: device:inode:size:mtime:ctime<TAB>absolute path\n# Remove or comment out entire lines for required files before running the second pass.\n' > "$temp"
+    printf '# First-pass media inventory for main/run_all_2.sh. NO FILES DELETED.\n# Format: device:inode:size:mtime:ctime<TAB>absolute path\n# Remove or comment out entire lines for required files before running the second pass.\n' > "$temp"
     while IFS= read -r -d '' path; do
         # A plain editable line format cannot safely represent embedded newlines.
         if [[ "$path" == *$'\n'* || "$path" == *$'\r'* ]]; then

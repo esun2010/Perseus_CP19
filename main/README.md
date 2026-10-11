@@ -18,7 +18,7 @@ Validator references: [Chrony `-p`](https://chrony-project.org/doc/4.9/chronyd.h
 and [Netfilter documentation](https://netfilter.org/documentation/).
 
 
-Linux and FreeBSD share the top-level launchers, inputs, logs, account/media
+Linux and FreeBSD share the launchers in `main/`, inputs, logs, account/media
 review, and general configuration auditing.
 `platforms/FreeBSD/` contains only native implementations, platform documentation,
 and native tests. Shared code is loaded directly; changes do not need to be
@@ -27,15 +27,15 @@ copied into a second project tree.
 Edit `input/distribution.txt`: select exactly one of `ubuntu`, `debian`, `mint`,
 `freebsd`, or `auto`. The selection must match the running OS. On either platform:
 
-- `bash run_all.sh`: general hardening and inventories (`sys` combines component checks).
-- `bash run_all_2.sh`: apply reviewed account and media cleanup.
+- `bash main/run_all.sh`: general hardening and inventories (`sys` combines component checks).
+- `bash main/run_all_2.sh`: apply reviewed account and media cleanup.
 
-Run as root. On FreeBSD without Bash, use `sh bootstrap.sh` from the repository
+Run as root. On FreeBSD without Bash, use `sh main/bootstrap.sh` from the repository
 root; it backs up configuration before installing prerequisites.
 
-Both platforms use **`input/`**, **`log/`**, **`all_logs.txt`**, and
-**`all_logs(2).txt`** at the repository root. Review the shared account
-allowlists before running. FreeBSD progress uses `.run_all_status.freebsd`;
+Both platforms use **`input/`**, **`log/`**, and the aggregate logs
+**`main/all_logs.txt`** and **`main/all_logs(2).txt`**. Review the shared account
+allowlists before running. FreeBSD progress uses `main/.run_all_status.freebsd`;
 Linux progress is kept separately.
 
 Native `pkg`, rc, OpenPAM, sysctl, and boot code remains in
@@ -52,7 +52,7 @@ This is a set of scripts to run for CyberPatriot Linux
 
 From the repository root, run `./setup.sh`. This single command creates or
 reuses the project `.venv`, installs or updates the website dependencies from
-`requirements.txt`, and starts the dashboard in the foreground. It
+`main/requirements.txt`, and starts the dashboard in the foreground. It
 does not run APT updates or CyberPatriot setup tasks. Enter your sudo password
 when prompted so the existing scripts can run with their required privileges. Open
 <http://127.0.0.1:5000> in a browser; press Ctrl+C in the terminal to stop the
@@ -60,21 +60,24 @@ server. The dashboard runs with elevated privileges so its script buttons can
 perform their intended local practice operations.
 
 The UI reads and writes the original files in `input/` and the package list in
-`rm_stuff/bad_pkg.sh`. It stores dashboard status in `.webapp_state.json` and
+`rm_stuff/bad_pkg.sh`. It stores dashboard status in `main/.webapp_state.json` and
 per-run output under `log/webapp-runs/`; both are ignored by Git. Configuration
 buttons appear after the app observes a changed file during a dashboard-launched
 run. The interface is intended for local practice and should remain bound to
 localhost.
 
+The authorized-user and authorized-admin lists are edited from buttons in the
+User Audit section. The files stay in `input/` and keep their original formats.
+
 ALL NEW COMMENTS GO DOWN HERE(do not edit or change anything above):
 
-Run `sudo bash run_all.sh` to select CyberPatriot tasks. `auto` runs every
+Run `sudo bash main/run_all.sh` to select CyberPatriot tasks. `auto` runs every
 listed task; Enter resumes unfinished tasks. Package removal uses its fixed list
 without prompting. Select `mal` to install ClamAV and scan the filesystem; the
 transcript is saved to `log/clamav.txt`.
 
 The launcher, `misc` scripts and media-removal script append to
-the root `all_logs.txt`, regardless of the working directory. Configuration
+`main/all_logs.txt`, regardless of the working directory. Configuration
 edits include old/new lines; service state, backups, permissions, firewall
 status and failures are logged. SSH/Apache validate before reloading and restore
 their configurations on failure. vsftpd has no validation-only mode, so failed
@@ -93,15 +96,15 @@ Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
 
 ## File descriptions
 
-### Root files and shared helpers
+### Files in `main/`
 
 | File | Description |
 | --- | --- |
-| `README.md` | Explains how to select tasks, configure critical services, run checks, and understand the project files. |
-| `.gitattributes` | Tells Git to use Linux-style LF line endings for shell scripts. |
-| `run_all.sh` | Interactive CyberPatriot scoring tasks with saved progress. |
-| `all_logs.txt` | Stores the shared, accumulating audit log with script names. Scripts using the logging helper record configuration changes, permissions, actions, and failures here. |
-| `logging.sh` | Provides shared functions for logging actions, comparing configuration files before and after edits, and recording permission changes. Other scripts source this helper rather than run it as a task. |
+| `main/README.md` | Explains how to select tasks, configure critical services, run checks, and understand the project files. |
+| `main/.gitattributes` | Tells Git to use Linux-style LF line endings for shell scripts. |
+| `main/run_all.sh` | Interactive CyberPatriot scoring tasks with saved progress. |
+| `main/all_logs.txt` | Stores the shared, accumulating audit log with script names. Scripts using the logging helper record configuration changes, permissions, actions, and failures here. |
+| `main/logging.sh` | Provides shared functions for logging actions, comparing configuration files before and after edits, and recording permission changes. Other scripts source this helper rather than run it as a task. |
 
 ### General hardening and removal scripts
 
@@ -135,7 +138,7 @@ Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
 
 These files are created when the relevant scripts run and may not exist yet.
 The permission report and individual scan reports are overwritten on subsequent
-runs, unlike the accumulating `all_logs.txt`.
+runs, unlike the accumulating `main/all_logs.txt`.
 
 | File | Description |
 | --- | --- |
@@ -143,13 +146,13 @@ runs, unlike the accumulating `all_logs.txt`.
 
 ## Package updates and file locations
 
-After selecting eligible tasks, `run_all.sh` runs `sudo apt update` and then
+After selecting eligible tasks, `main/run_all.sh` runs `sudo apt update` and then
 `sudo apt upgrade` before the selected scripts. The upgrade retains its normal
 confirmation prompt. If either command fails, the launcher stops and records
-the failure in `all_logs.txt`.
+the failure in `main/all_logs.txt`.
 
 Edit the scenario input lists in `input/`: `auth_users.txt` and `auth_admins.txt`. Generated reports are stored in `log/`.
-The shared audit log remains at the repository root as `all_logs.txt`.
+The shared audit log is `main/all_logs.txt`.
 
 ## Sudo and polkit administrator allowlist
 
@@ -166,7 +169,7 @@ and sudoers includes no longer apply; their files remain on disk. It validates
 the existing and generated sudoers with `visudo`, validates the installed policy,
 and restores the previous policies if installation fails. Root-only backups
 are retained under `/var/backups/cyberpatriot-admin-access.*`; the exact path
-and policy changes are recorded in `all_logs.txt`.
+and policy changes are recorded in `main/all_logs.txt`.
 
 The managed `/etc/polkit-1/rules.d/00-cyberpatriot-admins.rules` limits the
 identities available for administrator authentication to root and the list.
@@ -292,7 +295,7 @@ are not automatically deleted. Symbolic-link targets passed directly for editing
 are refused; links inside a directory snapshot are preserved without following
 them. Resolve unusual linked configuration layouts before rerunning.
 
-To recover a single file, locate its backup in `all_logs.txt`, inspect the
+To recover a single file, locate its backup in `main/all_logs.txt`, inspect the
 snapshot, then use `sudo cp -p /var/backups/cyberpatriot/<snapshot>/files/etc/<file> /etc/<file>`
 (or run `cp -p` from a root shell). Validate the restored configuration before
 reloading its service. An `ABSENT` manifest entry means the file did not exist
@@ -310,7 +313,7 @@ python3 tests/backup_commands_test.py
 
 ### Initial system repairs
 
-`run_all.sh` sets a trusted PATH before its first external command. After validating task selection and root access, it runs `service_helpers/startup_repair.sh` before upgrades or selected non-service tasks, including on resume. Any failed repair stops subsequent tasks.
+`main/run_all.sh` sets a trusted PATH before its first external command. After validating task selection and root access, it runs `service_helpers/startup_repair.sh` before upgrades or selected non-service tasks, including on resume. Any failed repair stops subsequent tasks.
 
 Ubuntu scans `/etc`, `/var/lib/dpkg`, `/var/lib/apt` and `/var/cache/apt` for immutable/append-only flags. It backs up affected paths, records original flags in the backup, then clears the flags. It also repairs the default login PATH in `/etc/environment`, preserving other variables. Individual shell startup files can still override PATH and need manual review. FreeBSD performs the native flag repair in `/etc`, `/usr/local/etc` and `/var/db/pkg`; securelevel restrictions may require single-user repair. Neither implementation clears flags across the whole filesystem.
 
@@ -326,13 +329,13 @@ The catalog includes the managed web, database, mail, file-sharing and VPN servi
 
 ### First-pass review and second-pass cleanup
 
-Populate `input/auth_users.txt` and `input/auth_admins.txt` first. At least one existing non-root administrator is required; administrator entries also count as authorized users. In `run_all.sh`, select `usr mp3` to generate the account and media inventories. These two first-pass tasks only report; they do not delete users or media. Other first-launcher tasks retain their existing behavior.
+Populate `input/auth_users.txt` and `input/auth_admins.txt` first. At least one existing non-root administrator is required; administrator entries also count as authorized users. In `main/run_all.sh`, select `usr mp3` to generate the account and media inventories. These two first-pass tasks only report; they do not delete users or media. Other first-launcher tasks retain their existing behavior.
 
 Review `log/unauth_users(2).txt`, `log/unauth_admins(2).txt`, and `log/media_files(2).txt`. Remove or comment out whole candidate lines for accounts/files that must be retained, or correct the allowlists and rerun the audit. The account reports contain usernames and their numeric UIDs; the media report contains an identity signature, a tab, and the absolute path. Do not edit those identity fields.
 
-Then run `sudo bash run_all_2.sh` on Ubuntu, or `bash run_all_2.sh` from a FreeBSD root shell. This explicit second launcher deletes reviewed unauthorized local accounts (retaining home directories), revokes reviewed administrator memberships and local sudo/doas access, leaves global polkit policy unchanged, and removes the reviewed media files after backing them up. It does not rerun upgrades or general hardening. User deletion is not forced: active sessions, UID-zero aliases, the invoking sudo/doas account, identity changes, or failed backups stop or fail cleanup for review. Revoked users must log out of existing sessions; existing root shells and custom polkit action grants require separate review.
+Then run `sudo bash main/run_all_2.sh` on Ubuntu, or `bash main/run_all_2.sh` from a FreeBSD root shell. This explicit second launcher deletes reviewed unauthorized local accounts (retaining home directories), revokes reviewed administrator memberships and local sudo/doas access, leaves global polkit policy unchanged, and removes the reviewed media files after backing them up. It does not rerun upgrades or general hardening. User deletion is not forced: active sessions, UID-zero aliases, the invoking sudo/doas account, identity changes, or failed backups stop or fail cleanup for review. Revoked users must log out of existing sessions; existing root shells and custom polkit action grants require separate review.
 
-Second-pass actions are appended to `log/user_management(2).txt`, `log/media_cleanup(2).txt`, and the combined `all_logs(2).txt`. Both cleanup scripts can also be run separately. Current allowlists are checked again, so newly authorized users are preserved. Missing or changed media is not blindly deleted. Root and system service accounts are not automatically treated as unauthorized ordinary users.
+Second-pass actions are appended to `log/user_management(2).txt`, `log/media_cleanup(2).txt`, and the combined `main/all_logs(2).txt`. Both cleanup scripts can also be run separately. Current allowlists are checked again, so newly authorized users are preserved. Missing or changed media is not blindly deleted. Root and system service accounts are not automatically treated as unauthorized ordinary users.
 
 The media inventory covers MP3, MOV and MP4 under `/`, including separate local `/home` partitions. It excludes backups, remote/pseudo-filesystems, and conventional `/media` and `/mnt` mount trees. Use `MEDIA_ROOT=/home bash rm_stuff/rm_mp3+.sh` as root to narrow the inventory; each inventory replaces the previous media review file. Files with embedded newlines/carriage returns are logged for manual review instead of automatic removal.
 
@@ -430,7 +433,7 @@ The shared launcher consolidates the former `nss`, `openssl`, `grub`, `selinux`,
 (including `iptables`) select the entire consolidated task. Existing completion
 records for individual components do not skip the new combined task.
 
-Configuration edits append setting-level entries to `all_logs.txt`, in addition
+Configuration edits append setting-level entries to `main/all_logs.txt`, in addition
 to the original backups and file diffs: `changed SETTING from OLD to NEW` or
 `added SETTING with new value VALUE`. Entries include the configuration path and,
 for INI files, the section. Removed settings use `changed ... to <unset>`;
@@ -446,7 +449,7 @@ Second-pass cleanup acts only on entries remaining in the three root review logs
 Delete a line or prefix it with `#` to preserve that item. Keep the username/UID
 or file identity/path fields intact on retained removal entries. Empty or
 comment-only logs authorize no actions of that type; missing logs stop cleanup.
-Run `bash run_all_2.sh` after review. Do not rerun the first-pass inventory tasks
+Run `bash main/run_all_2.sh` after review. Do not rerun the first-pass inventory tasks
 between editing the logs and cleanup, because those tasks regenerate the lists.
 Second-pass cleanup never rescans for additional targets or rewrites the global
 polkit administrator policy. These rules apply to Linux and FreeBSD.

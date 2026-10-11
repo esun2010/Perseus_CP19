@@ -1,18 +1,38 @@
-
 # Local launcher progress
-.run_all_status
-.run_all_status.*
+/main/.run_all_status
+/main/.run_all_status.*
 /test
 
-# Generated second-pass review and action logs
+# Generated second-pass reports and dashboard transcripts
 /log/*(2).txt
-/all_logs(2).txt
-
-**/__pycache__/
-/.webapp_state.json
+/main/all_logs(2).txt
 /log/webapp-runs/
-/.venv/
 
-# Separate service launcher progress
-.run_all_services_status
-.run_all_services_status.*
+# Dashboard state
+/main/.webapp_state.json
+
+# Python virtual environments
+/.venv/
+/venv/
+/env/
+/ENV/
+**/.venv/
+**/venv/
+**/env/
+**/ENV/
+
+# Python bytecode, caches, and generated reports
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Build output and local OS/editor metadata
+/build/
+/dist/
+.DS_Store
+*.swp
+*~

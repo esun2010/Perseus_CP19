@@ -8,7 +8,7 @@ if [ "$(uname -s)" != FreeBSD ]; then
     exit 1
 fi
 if [ "$(id -u)" != 0 ]; then
-    echo 'Run sh bootstrap.sh from a root shell (su -).' >&2
+    echo 'Run sh main/bootstrap.sh from a root shell (su -).' >&2
     exit 1
 fi
 if [ "$(sysctl -n security.jail.jailed)" != 0 ]; then
@@ -16,7 +16,7 @@ if [ "$(sysctl -n security.jail.jailed)" != 0 ]; then
     exit 1
 fi
 if [ "$#" != 0 ]; then
-    echo 'Usage: sh bootstrap.sh (then select tasks interactively)' >&2
+    echo 'Usage: sh main/bootstrap.sh (then select tasks interactively)' >&2
     exit 1
 fi
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -45,4 +45,4 @@ pkg -N >/dev/null 2>&1 || pkg bootstrap -y
 if ! pkg info -e bash >/dev/null 2>&1; then
     pkg install -y bash
 fi
-exec /usr/local/bin/bash "$SCRIPT_DIR/../../run_all.sh"
+exec /usr/local/bin/bash "$SCRIPT_DIR/../../main/run_all.sh"

@@ -16,20 +16,20 @@ from typing import Any
 from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
 
 ROOT = Path(__file__).resolve().parents[1]
-STATE_PATH = ROOT / ".webapp_state.json"
+STATE_PATH = ROOT / "main" / ".webapp_state.json"
 STATE_LOCK = threading.RLock()
 RUNS: dict[str, dict[str, Any]] = {}
 
 app = Flask(__name__, template_folder=str(ROOT / "webapp" / "templates"), static_folder=str(ROOT / "webapp" / "static"))
 app.secret_key = os.environ.get("CYBERPATRIOT_FLASK_SECRET", "local-cyberpatriot-dashboard")
 
-# Keep this order aligned with ORDER and SCRIPT_MAP in run_all.sh.
+# Keep this order aligned with ORDER and SCRIPT_MAP in main/run_all.sh.
 TASKS = [
     {"id": "mal", "name": "ClamAV Scan", "script": "rm_stuff/clamav.sh", "logs": ["log/clamav.txt"]},
     {"id": "ker", "name": "Kernel", "script": "misc/kernel.sh", "configs": ["/etc/sysctl.d/99-hardening.conf", "/etc/sysctl.conf", "/etc/sudoers", "/etc/polkit-1/rules.d/00-cyberpatriot-admins.rules", "/usr/local/etc/sudoers", "/usr/local/etc/polkit-1/rules.d", "/etc/rc.conf", "/etc/fstab"]},
     {"id": "log", "name": "Guest Login", "script": "misc/login.sh", "configs": ["/etc/lightdm", "/etc/gdm3", "/etc/sddm.conf", "/usr/local/etc/lightdm"]},
     {"id": "pol", "name": "Password Policy", "script": "password_management/pwd_policy.sh", "configs": ["/etc/login.defs", "/etc/security/pwquality.conf", "/etc/security/faillock.conf", "/etc/pam.d/common-auth", "/etc/pam.d/common-account", "/etc/pam.d/common-password", "/etc/pam.d/common-session", "/etc/pam.d/common-session-noninteractive", "/usr/share/pam-configs/cyberpatriot-faillock-preauth", "/usr/share/pam-configs/cyberpatriot-faillock-authfail", "/etc/pam.d/passwd", "/etc/login.conf", "/etc/login.conf.db"]},
-    {"id": "usr", "name": "User Audit", "script": "user_management/user_management.sh", "logs": ["log/unauth_users(2).txt", "log/unauth_admins(2).txt"], "second": {"name": "User Cleanup", "script": "user_management/user_management_2.sh", "logs": ["log/user_management(2).txt"], "configs": ["/etc/passwd", "/etc/shadow", "/etc/group", "/etc/gshadow", "/etc/passwd-", "/etc/shadow-", "/etc/group-", "/etc/gshadow-", "/etc/master.passwd", "/etc/pwd.db", "/etc/spwd.db"]}},
+    {"id": "usr", "name": "User Audit", "script": "user_management/user_management.sh", "logs": ["log/unauth_users(2).txt", "log/unauth_admins(2).txt"], "edit_lists": [("Edit Authorized Users", "input/auth_users.txt"), ("Edit Authorized Admins", "input/auth_admins.txt")], "second": {"name": "User Cleanup", "script": "user_management/user_management_2.sh", "logs": ["log/user_management(2).txt"], "configs": ["/etc/passwd", "/etc/shadow", "/etc/group", "/etc/gshadow", "/etc/passwd-", "/etc/shadow-", "/etc/group-", "/etc/gshadow-", "/etc/master.passwd", "/etc/pwd.db", "/etc/spwd.db"]}},
     {"id": "mp3", "name": "Media Inventory", "script": "rm_stuff/rm_mp3+.sh", "logs": ["log/media_files(2).txt"], "second": {"name": "Media Cleanup", "script": "rm_stuff/rm_mp3+_2.sh", "logs": ["log/media_cleanup(2).txt"]}},
     {"id": "pkg", "name": "Bad Packages", "script": "rm_stuff/bad_pkg.sh", "edit_packages": True, "configs": ["/etc", "/usr/local/etc"]},
     {"id": "per", "name": "File Permissions", "script": "misc/file_permissions.sh", "configs": ["/etc/sudoers", "/etc/ssh/sshd_config", "/etc/crontab", "/etc/fstab", "/etc/hosts", "/etc/hostname", "/etc/master.passwd", "/etc/passwd", "/etc/group", "/etc/pwd.db", "/usr/local/etc/pam.d"], "logs": ["log/world_files.txt", "log/world_files.txt.errors"]},
@@ -37,15 +37,18 @@ TASKS = [
 ]
 
 INPUT_FILES = [
-    "input/auth_users.txt",
-    "input/auth_admins.txt",
     "input/critical_services.txt",
     "input/distribution.txt",
 ]
+EDITABLE_INPUT_FILES = INPUT_FILES + ["input/auth_users.txt", "input/auth_admins.txt"]
+INPUT_EDITOR_DETAILS = {
+    "input/auth_users.txt": ("Authorized Users", "Enter one authorized local username per line. Blank lines and lines beginning with # are ignored."),
+    "input/auth_admins.txt": ("Authorized Admins", "Enter each username followed by its password on the next line. Keep each username and password together; scripts read usernames and ignore password lines."),
+}
 UPDATE_ACTION = {
     "id": "updates",
     "name": "Updates and APT Reset",
-    "description": "Runs the initial startup repair and package refresh/upgrade steps used by run_all.sh.",
+    "description": "Runs the initial startup repair and package refresh/upgrade steps used by main/run_all.sh.",
     "configs": ["/etc/environment", "/etc/apt"],
 }
 
@@ -208,9 +211,9 @@ def _run_update_steps(run_id: str) -> list[str]:
     env["ROOT"] = str(ROOT)
     distro = "freebsd" if platform.system() == "FreeBSD" else "linux"
     if distro == "freebsd":
-        steps = 'source "$ROOT/logging.sh"; init_logging; source "$ROOT/service_helpers/startup_repair.sh"; startup_repair; pkg -N >/dev/null 2>&1 || pkg bootstrap -y; pkg update; backup_package_configuration; pkg upgrade'
+        steps = 'source "$ROOT/main/logging.sh"; init_logging; source "$ROOT/service_helpers/startup_repair.sh"; startup_repair; pkg -N >/dev/null 2>&1 || pkg bootstrap -y; pkg update; backup_package_configuration; pkg upgrade'
     else:
-        steps = 'source "$ROOT/logging.sh"; init_logging; source "$ROOT/service_helpers/startup_repair.sh"; startup_repair; sudo apt update; backup_package_configuration; sudo apt upgrade'
+        steps = 'source "$ROOT/main/logging.sh"; init_logging; source "$ROOT/service_helpers/startup_repair.sh"; startup_repair; sudo apt update; backup_package_configuration; sudo apt upgrade'
     output_path = ROOT / "log" / "webapp-runs" / f"{run_id}.log"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("ab") as output:
@@ -275,7 +278,7 @@ def _finish_run(script: str, run_id: str, code: int, message: str, extra: dict[s
 def dashboard():
     update_status = _status("__updates__")
     update_files = _files_for_updates()
-    aggregate = [name for name in ("all_logs.txt", "all_logs(2).txt") if _is_regular_view_file(name)]
+    aggregate = [name for name in ("main/all_logs.txt", "main/all_logs(2).txt") if _is_regular_view_file(name)]
     return render_template("dashboard.html", tasks=_all_tasks(), inputs=INPUT_FILES, update=UPDATE_ACTION, update_status=update_status, update_files=update_files, aggregate=aggregate)
 
 
@@ -346,11 +349,11 @@ def _files_for_updates() -> dict[str, list[str]]:
 
 @app.get("/edit/<path:relpath>")
 def edit_input(relpath: str):
-    if relpath not in INPUT_FILES:
+    if relpath not in EDITABLE_INPUT_FILES:
         abort(404)
     path = _resolve_repo_file(relpath)
     if not path.is_file() or path.is_symlink():
-        return render_template("edit.html", relpath=relpath, filename=path.name, contents="", error="This input file is missing or is not a regular file."), 404
+        return _render_input_editor(relpath, path.name, "", "This input file is missing or is not a regular file."), 404
     try:
         contents = path.read_text(encoding="utf-8")
     except OSError as exc:
@@ -358,12 +361,20 @@ def edit_input(relpath: str):
         error = str(exc)
     else:
         error = None
-    return render_template("edit.html", relpath=relpath, filename=path.name, contents=contents, error=error)
+    return _render_input_editor(relpath, path.name, contents, error)
+
+
+def _render_input_editor(relpath: str, filename: str, contents: str, error: str | None, status_code: int = 200):
+    page_title, instructions = INPUT_EDITOR_DETAILS.get(relpath, ("Edit Input File", "Edit the original input file used by the scripts."))
+    return render_template(
+        "edit.html", relpath=relpath, filename=filename, contents=contents,
+        page_title=page_title, instructions=instructions, error=error,
+    ), status_code
 
 
 @app.post("/edit/<path:relpath>")
 def save_input(relpath: str):
-    if relpath not in INPUT_FILES:
+    if relpath not in EDITABLE_INPUT_FILES:
         abort(404)
     path = _resolve_repo_file(relpath)
     if not path.is_file() or path.is_symlink():
@@ -377,7 +388,7 @@ def save_input(relpath: str):
             content = content.replace("\n", newline)
         path.write_text(content, encoding="utf-8", newline="")
     except OSError as exc:
-        return render_template("edit.html", relpath=relpath, filename=path.name, contents=content, error=str(exc)), 500
+        return _render_input_editor(relpath, path.name, content, str(exc), 500)
     return redirect(url_for("edit_input", relpath=relpath, saved="1"))
 
 

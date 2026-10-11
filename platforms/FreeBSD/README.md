@@ -13,7 +13,7 @@ package. Neither sudo nor GNU coreutils is required to launch the toolkit.
 
 All paths and commands below are relative to the repository root. Clone the
 whole project: this folder is a native backend, not a standalone copy.
-`input/`, `log/`, `all_logs.txt`, the general launcher, account/media review,
+`input/`, `log/`, `main/all_logs.txt`, the general launcher, account/media review,
 and logging are shared with Linux. FreeBSD-specific operations stay here.
 
 ## Start on FreeBSD
@@ -25,7 +25,7 @@ and logging are shared with Linux. FreeBSD-specific operations stay here.
 3. Open a root shell using `su -`, change into the repository root, and run:
 
    ```sh
-   sh bootstrap.sh
+   sh main/bootstrap.sh
    ```
 
 The bootstrap installs `pkg` and Bash if needed, then opens the interactive menu.
@@ -33,7 +33,7 @@ Installation and upgrades require access to configured package repositories.
 Once Bash is installed, run the launcher or an individual task as root with:
 
 ```sh
-/usr/local/bin/bash run_all.sh
+/usr/local/bin/bash main/run_all.sh
 ```
 
 Only `bootstrap.sh` uses base `/bin/sh`. Other `.sh` files use Bash. Helpers are
@@ -45,7 +45,7 @@ access available while changing administrator access or firewall rules.
 
 Enter keywords separated by spaces, `all` to rerun every eligible task, or a blank
 line to resume unfinished tasks. Command-line task arguments are not supported.
-Before general tasks run, `run_all.sh` executes `pkg update` and `pkg upgrade`;
+Before general tasks run, `main/run_all.sh` executes `pkg update` and `pkg upgrade`;
 the upgrade retains its normal confirmation prompt. This is not a FreeBSD release
 upgrade tool; maintain the base system using the method appropriate to your image.
 
@@ -56,7 +56,7 @@ upgrade tool; maintain the base system using the method appropriate to your imag
 | `log` | Disable the local guest account and optional LightDM guest access. |
 | `pol` | Set native passwd PAM quality checks and default login-class password aging. |
 | `usr` | Audit local users and wheel/UID-zero administrators without deleting accounts. |
-| `mp3` | Inventory MP3/MOV/MP4 files for review; only run_all_2.sh deletes reviewed files. |
+| `mp3` | Inventory MP3/MOV/MP4 files for review; only main/run_all_2.sh deletes reviewed files. |
 | `pkg` | Remove installed matches from the fixed package list. |
 | `per` | Apply native file permissions and report world-writable paths. |
 | `sys` | Run the combined native system-component checks described below. |
@@ -122,7 +122,7 @@ that a system is clean.
 
 ## Reports, backups, and checks
 
-`all_logs.txt` accumulates actions, configuration diffs, permission
+`main/all_logs.txt` accumulates actions, configuration diffs, permission
 changes, and errors at the repository root with mode `0600`. Reports under `log/`
 are overwritten on each corresponding run:
 
@@ -174,7 +174,7 @@ The same protection covers native password/account commands and package hooks.
 Package installation, upgrades and removal first snapshot `/etc` and `/usr/local/etc`.
 FreeBSD startup-setting changes snapshot all configuration files reported by
 [`sysrc -l`](https://man.freebsd.org/cgi/man.cgi?query=sysrc&sektion=8), including
-custom locations. The initial `sh bootstrap.sh` installation uses a separate
+custom locations. The initial `sh main/bootstrap.sh` installation uses a separate
 private `/var/backups/cyberpatriot-bootstrap.*` snapshot before Bash is available.
 Backups of secrets are kept out of the audit log; only their location is logged.
 Existing configuration diffs are still logged for ordinary text-policy edits.
@@ -187,7 +187,7 @@ are not automatically deleted. Symbolic-link targets passed directly for editing
 are refused; links inside a directory snapshot are preserved without following
 them. Resolve unusual linked configuration layouts before rerunning.
 
-To recover a single file, locate its backup in `all_logs.txt`, inspect the
+To recover a single file, locate its backup in `main/all_logs.txt`, inspect the
 snapshot, then use `sudo cp -p /var/backups/cyberpatriot/<snapshot>/files/etc/<file> /etc/<file>`
 (or run `cp -p` from a root shell). Validate the restored configuration before
 reloading its service. An `ABSENT` manifest entry means the file did not exist
@@ -205,7 +205,7 @@ python3 platforms/FreeBSD/tests/backup_commands_test.py
 
 ### Initial system repairs
 
-`run_all.sh` sets a trusted PATH before its first external command. After validating task selection and root access, it runs `service_helpers/startup_repair.sh` before upgrades or selected tasks, including on resume. Any failed repair stops subsequent tasks.
+`main/run_all.sh` sets a trusted PATH before its first external command. After validating task selection and root access, it runs `service_helpers/startup_repair.sh` before upgrades or selected tasks, including on resume. Any failed repair stops subsequent tasks.
 
 Ubuntu scans `/etc`, `/var/lib/dpkg`, `/var/lib/apt` and `/var/cache/apt` for immutable/append-only flags. It backs up affected paths, records original flags in the backup, then clears the flags. It also repairs the default login PATH in `/etc/environment`, preserving other variables. Individual shell startup files can still override PATH and need manual review. FreeBSD performs the native flag repair in `/etc`, `/usr/local/etc` and `/var/db/pkg`; securelevel restrictions may require single-user repair. Neither implementation clears flags across the whole filesystem.
 
@@ -221,13 +221,13 @@ The catalog includes the managed web, database, mail, file-sharing and VPN servi
 
 ### First-pass review and second-pass cleanup
 
-Populate `input/auth_users.txt` and `input/auth_admins.txt` first. At least one existing non-root administrator is required; administrator entries also count as authorized users. In `run_all.sh`, select `usr mp3` to generate the account and media inventories. These two first-pass tasks only report; they do not delete users or media. Other first-launcher tasks retain their existing behavior.
+Populate `input/auth_users.txt` and `input/auth_admins.txt` first. At least one existing non-root administrator is required; administrator entries also count as authorized users. In `main/run_all.sh`, select `usr mp3` to generate the account and media inventories. These two first-pass tasks only report; they do not delete users or media. Other first-launcher tasks retain their existing behavior.
 
 Review `log/unauth_users(2).txt`, `log/unauth_admins(2).txt`, and `log/media_files(2).txt`. Remove or comment out whole candidate lines for accounts/files that must be retained, or correct the allowlists and rerun the audit. The account reports contain usernames and their numeric UIDs; the media report contains an identity signature, a tab, and the absolute path. Do not edit those identity fields.
 
-Then run `sudo bash run_all_2.sh` on Ubuntu, or `bash run_all_2.sh` from a FreeBSD root shell. This explicit second launcher deletes reviewed unauthorized local accounts (retaining home directories), revokes reviewed administrator memberships and local sudo/doas access, leaves global polkit policy unchanged, and removes the reviewed media files after backing them up. It does not rerun upgrades or general hardening. User deletion is not forced: active sessions, UID-zero aliases, the invoking sudo/doas account, identity changes, or failed backups stop or fail cleanup for review. Revoked users must log out of existing sessions; existing root shells and custom polkit action grants require separate review.
+Then run `sudo bash main/run_all_2.sh` on Ubuntu, or `bash main/run_all_2.sh` from a FreeBSD root shell. This explicit second launcher deletes reviewed unauthorized local accounts (retaining home directories), revokes reviewed administrator memberships and local sudo/doas access, leaves global polkit policy unchanged, and removes the reviewed media files after backing them up. It does not rerun upgrades or general hardening. User deletion is not forced: active sessions, UID-zero aliases, the invoking sudo/doas account, identity changes, or failed backups stop or fail cleanup for review. Revoked users must log out of existing sessions; existing root shells and custom polkit action grants require separate review.
 
-Second-pass actions are appended to `log/user_management(2).txt`, `log/media_cleanup(2).txt`, and the combined `all_logs(2).txt`. Both cleanup scripts can also be run separately. Current allowlists are checked again, so newly authorized users are preserved. Missing or changed media is not blindly deleted. Root and system service accounts are not automatically treated as unauthorized ordinary users.
+Second-pass actions are appended to `log/user_management(2).txt`, `log/media_cleanup(2).txt`, and the combined `main/all_logs(2).txt`. Both cleanup scripts can also be run separately. Current allowlists are checked again, so newly authorized users are preserved. Missing or changed media is not blindly deleted. Root and system service accounts are not automatically treated as unauthorized ordinary users.
 
 The media inventory covers MP3, MOV and MP4 under `/`, including separate local `/home` partitions. It excludes backups, remote/pseudo-filesystems, and conventional `/media` and `/mnt` mount trees. Use `MEDIA_ROOT=/home bash rm_stuff/rm_mp3+.sh` as root to narrow the inventory; each inventory replaces the previous media review file. Files with embedded newlines/carriage returns are logged for manual review instead of automatic removal.
 
@@ -247,7 +247,7 @@ service actions in these scripts, not arbitrary third-party package hooks.
 
 ## Native system-component hardening
 
-Select `sys` in the shared `run_all.sh`, or run `bash misc/system_hardening.sh`.
+Select `sys` in the shared `main/run_all.sh`, or run `bash misc/system_hardening.sh`.
 The shared runner invokes all components below using the native FreeBSD backend.
 Legacy component keywords also select the entire combined task.
 
@@ -300,7 +300,7 @@ References: [FreeBSD routing](https://docs.freebsd.org/en/books/handbook/advance
 [certificate management](https://man.freebsd.org/cgi/man.cgi?manpath=FreeBSD+12.4-RELEASE&query=certctl).
 
 Configuration edits made by `misc` scripts and their shared helpers append
-setting-level entries to `all_logs.txt`: `changed SETTING from OLD to NEW` or
+setting-level entries to `main/all_logs.txt`: `changed SETTING from OLD to NEW` or
 `added SETTING with new value VALUE`. Each setting includes its file path and
 INI section where applicable. This covers sysctl and rc settings, LightDM,
 sudoers/polkit policies, and fstab mount options. Removed settings are recorded
@@ -317,7 +317,7 @@ Second-pass cleanup acts only on entries remaining in the three root review logs
 Delete a line or prefix it with `#` to preserve that item. Keep the username/UID
 or file identity/path fields intact on retained removal entries. Empty or
 comment-only logs authorize no actions of that type; missing logs stop cleanup.
-Run `bash run_all_2.sh` after review. Do not rerun the first-pass inventory tasks
+Run `bash main/run_all_2.sh` after review. Do not rerun the first-pass inventory tasks
 between editing the logs and cleanup, because those tasks regenerate the lists.
 Second-pass cleanup never rescans for additional targets or rewrites the global
 polkit administrator policy. These rules apply to Linux and FreeBSD.

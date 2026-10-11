@@ -12,7 +12,7 @@
       <p>{{ update.description }}</p>
     </div>
     <div class="script-row" data-script="updates" data-status-url="{{ url_for('status', script='updates') }}">
-      <div class="script-label"><strong>Initial system repair and package update</strong><span>Uses the existing run_all.sh startup repair and update/upgrade steps.</span></div>
+      <div class="script-label"><strong>Initial system repair and package update</strong><span>Uses the existing main/run_all.sh startup repair and update/upgrade steps.</span></div>
       <div class="run-controls"><span class="status-message" data-status-message>{{ update_status.message or update_status.status }}</span><button class="run-button {{ update_status.status|lower }}" data-run-url="{{ url_for('run_script', script='updates') }}">Run</button></div>
     </div>
     <div class="file-actions" data-files-container>
@@ -43,6 +43,7 @@
       </div>
       <div class="file-actions" data-files-container>
         {% if task.edit_packages and loop.first %}<a class="button secondary" href="{{ url_for('edit_packages') }}">Edit List</a>{% endif %}
+        {% if task.edit_lists and loop.first %}{% for label, file in task.edit_lists %}<a class="button secondary" href="{{ url_for('edit_input', relpath=file) }}">{{ label }}</a>{% endfor %}{% endif %}
         {% for file in script_files.logs %}<a class="button file-button" href="{{ url_for('view_file', path=file) }}" target="_blank" rel="noopener">Log: {{ file }}</a>{% endfor %}
         {% for file in script_files.configs %}<a class="button file-button" href="{{ url_for('view_file', path=file) }}" target="_blank" rel="noopener">Config: {{ file }}</a>{% endfor %}
       </div>
@@ -53,7 +54,7 @@
 
   {% for file in aggregate %}
   <section class="panel aggregate-panel">
-    <div class="section-heading"><div><span class="section-number">{{ tasks|length + loop.index + 2 }}</span><h2>{% if file == 'all_logs.txt' %}Aggregate Log{% else %}Second-pass Aggregate Log{% endif %}</h2></div><span class="script-path">{{ file }}</span></div>
+    <div class="section-heading"><div><span class="section-number">{{ tasks|length + loop.index + 2 }}</span><h2>{% if file.endswith('all_logs.txt') %}Aggregate Log{% else %}Second-pass Aggregate Log{% endif %}</h2></div><span class="script-path">{{ file }}</span></div>
     <div class="file-actions"><a class="button file-button" href="{{ url_for('view_file', path=file) }}" target="_blank" rel="noopener">View {{ file }}</a></div>
   </section>
   {% endfor %}

@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Edit {{ filename }}{% endblock %}
 {% block body %}
-  <div class="page-heading"><h1>Edit Input File</h1><p class="file-path">{{ filename }} · {{ relpath }}</p></div>
+  <div class="page-heading"><h1>{{ page_title }}</h1><p class="file-path">{{ filename }} · {{ relpath }}</p></div>
   <section class="panel editor-panel">
+    <p>{{ instructions }}</p>
     {% if error %}<p class="error-banner">Could not read this file: {{ error }}</p>{% endif %}
     {% if request.args.get('saved') %}<p class="success-banner">Saved to the original input file.</p>{% endif %}
     {% if not error %}<form method="post" action="{{ url_for('save_input', relpath=relpath) }}">

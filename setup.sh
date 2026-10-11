@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+MAIN_DIR="$SCRIPT_DIR/main"
 VENV_DIR="$SCRIPT_DIR/.venv"
 VENV_PYTHON="$VENV_DIR/bin/python"
 
@@ -20,8 +21,8 @@ fi
 [[ -x "$VENV_PYTHON" ]] || fail "The virtual environment did not create its Python executable: $VENV_PYTHON"
 "$VENV_PYTHON" -m pip --version >/dev/null 2>&1 || fail 'pip is unavailable in .venv. Recreate the virtual environment with Python venv support, then run ./setup.sh again.'
 
-printf 'Installing dashboard dependencies from requirements.txt\n'
-if ! "$VENV_PYTHON" -m pip install --disable-pip-version-check --no-cache-dir -r "$SCRIPT_DIR/requirements.txt"; then
+printf 'Installing dashboard dependencies from main/requirements.txt\n'
+if ! "$VENV_PYTHON" -m pip install --disable-pip-version-check --no-cache-dir -r "$MAIN_DIR/requirements.txt"; then
     fail 'Dependency installation failed. Check the network/package index and run ./setup.sh again. The dashboard was not started.'
 fi
 
@@ -48,10 +49,10 @@ fi
 cd "$SCRIPT_DIR"
 if (( EUID == 0 )); then
     printf 'Starting the dashboard at http://127.0.0.1:%s\n' "$PORT"
-    exec env CYBERPATRIOT_HOST=127.0.0.1 "CYBERPATRIOT_PORT=$PORT" "$VENV_PYTHON" "$SCRIPT_DIR/run_dashboard.py"
+    exec env CYBERPATRIOT_HOST=127.0.0.1 "CYBERPATRIOT_PORT=$PORT" "$VENV_PYTHON" "$MAIN_DIR/run_dashboard.py"
 fi
 
 command -v sudo >/dev/null 2>&1 || fail 'sudo is required to run the dashboard with permission to execute the CyberPatriot scripts.'
 sudo -v || fail 'Could not obtain elevated privileges to run the dashboard. The server was not started.'
 printf 'Starting the dashboard at http://127.0.0.1:%s\n' "$PORT"
-exec sudo -- env CYBERPATRIOT_HOST=127.0.0.1 "CYBERPATRIOT_PORT=$PORT" "$VENV_PYTHON" "$SCRIPT_DIR/run_dashboard.py"
+exec sudo -- env CYBERPATRIOT_HOST=127.0.0.1 "CYBERPATRIOT_PORT=$PORT" "$VENV_PYTHON" "$MAIN_DIR/run_dashboard.py"

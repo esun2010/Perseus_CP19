@@ -2,7 +2,7 @@
 # Native FreeBSD equivalents for the Linux non-service task names.
 COMPONENT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$COMPONENT_ROOT/service_helpers/platform.sh"
-source "$COMPONENT_ROOT/../../logging.sh"
+source "$COMPONENT_ROOT/../../main/logging.sh"
 source "$COMPONENT_ROOT/service_helpers/permissions.sh"
 source "$COMPONENT_ROOT/service_helpers/path_hardening.sh"
 component_config() {

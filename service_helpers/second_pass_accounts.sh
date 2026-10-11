@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Shared local-account audit and explicitly invoked second-pass cleanup.
 SECOND_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-source "$SECOND_ROOT/logging.sh"
+source "$SECOND_ROOT/main/logging.sh"
 
 account_platform_init() {
     case "$(uname -s)" in
@@ -117,7 +117,7 @@ account_review() {
     done <<< "$ACCOUNT_RECORDS"
     chmod 644 "$tmp_users" "$tmp_admins" || return 1
     mv "$tmp_users" "$users" && mv "$tmp_admins" "$admins" || return 1
-    log "AUDIT ONLY: review $users and $admins, then run run_all_2.sh; no accounts changed"
+    log "AUDIT ONLY: review $users and $admins, then run main/run_all_2.sh; no accounts changed"
 }
 
 load_review_candidates() {

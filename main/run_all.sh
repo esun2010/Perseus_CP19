@@ -4,10 +4,11 @@ set -uo pipefail
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/sbin:/usr/local/bin
 hash -r
 if (($#)); then
-    echo 'This launcher only supports interactive selection. Run: sudo bash run_all.sh' >&2
+    echo 'This launcher only supports interactive selection. Run: sudo bash main/run_all.sh' >&2
     exit 1
 fi
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MAIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$MAIN_DIR/.." && pwd)"
 source "$SCRIPT_DIR/service_helpers/distribution.sh"
 load_distribution || exit 1
 source "$SCRIPT_DIR/service_helpers/task_paths.sh"
@@ -40,7 +41,7 @@ declare -A DESCRIPTION=(
 resolve_task_paths
 
 # Store task keywords as data, never as executable shell code.
-STATE_FILE="$SCRIPT_DIR/.run_all_status"
+STATE_FILE="$MAIN_DIR/.run_all_status"
 [[ "$CP_DISTRO" != freebsd ]] || STATE_FILE+=.freebsd
 [[ ! -L "$STATE_FILE" && ( ! -e "$STATE_FILE" || -f "$STATE_FILE" ) ]] || {
     echo "Refusing unsafe state file: $STATE_FILE" >&2; exit 1;
@@ -111,10 +112,10 @@ for key in "${ORDER[@]}"; do
 done
 printf 'Selected: %s\n' "${SCRIPTS[@]}"
 if ((${#SCRIPTS[@]} == 0)); then echo 'No eligible scripts selected.'; exit 0; fi
-[[ $(id -u) == 0 ]] || { echo 'Run with sudo: sudo bash run_all.sh' >&2; exit 1; }
+[[ $(id -u) == 0 ]] || { echo 'Run with sudo: sudo bash main/run_all.sh' >&2; exit 1; }
 require_launcher_platform || exit 1
 cd "$SCRIPT_DIR" || exit 1
-source "$SCRIPT_DIR/logging.sh"
+source "$MAIN_DIR/logging.sh"
 init_logging
 # Initial repairs always precede upgrades and selected tasks.
 source "$SCRIPT_DIR/service_helpers/startup_repair.sh"

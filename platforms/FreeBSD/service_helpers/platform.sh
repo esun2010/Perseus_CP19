@@ -16,7 +16,7 @@ require_freebsd_root() {
         return 1
     }
     ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 3))) || {
-        echo 'Bash 4.3 or newer is required. Run sh bootstrap.sh first.' >&2
+        echo 'Bash 4.3 or newer is required. Run sh main/bootstrap.sh first.' >&2
         return 1
     }
     umask 077

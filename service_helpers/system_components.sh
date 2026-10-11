@@ -6,7 +6,7 @@ if [[ $(uname -s) == FreeBSD ]]; then
 fi
 # Non-daemon Linux components. Source this file; invoke through misc/system_hardening.sh.
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-source "$REPO_DIR/logging.sh"
+source "$REPO_DIR/main/logging.sh"
 source "$REPO_DIR/service_helpers/distribution.sh"
 source "$REPO_DIR/service_helpers/permissions.sh"
 source "$REPO_DIR/service_helpers/path_hardening.sh"

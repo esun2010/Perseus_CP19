@@ -4,7 +4,7 @@ if [[ "${BASH_SOURCE[0]}" == "$0" && $(uname -s) == FreeBSD ]]; then
 fi
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../logging.sh"
+source "$SCRIPT_DIR/../main/logging.sh"
 [[ $EUID -eq 0 ]] || { echo 'Run this script as root.' >&2; exit 1; }
 BAD_PACKAGES=(nmap netcat netcat-openbsd netcat-traditional john hydra medusa ophcrack hashcat wireshark aircrack-ng kismet telnet rsh-server xinetd tor deluge transmission sqlmap nikto)
 for pkg in "${BAD_PACKAGES[@]}"; do
