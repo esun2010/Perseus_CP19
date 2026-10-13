@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Backup Review{% endblock %}
+{% block body %}
+<div class="page-heading"><h1>Script Change Review</h1><p>{{ record.script }} · {{ record.created_at }} · {{ record.id }}</p></div>
+<section class="panel"><div class="section-heading"><div><h2>Configuration paths</h2></div></div>
+{% for entry in results %}<div class="backup-item"><div><strong>{{ entry.path }}</strong><span>Status: {{ entry.status|title }}{% if not entry.existed and entry.status == 'created' %} · no original backup; compare against a directory or reference file using the general tool.{% elif entry.status == 'deleted' %} · original retained in backup.{% endif %}</span></div>
+{% if entry.existed %}<div class="file-actions"><form method="post" action="{{ url_for('compare_backup') }}"><input type="hidden" name="backup_id" value="{{ record.id }}"><input type="hidden" name="path" value="{{ entry.path }}"><button class="button secondary">Compare with Backup</button></form>
+<form method="post" action="{{ url_for('restore_backup') }}"><input type="hidden" name="backup_id" value="{{ record.id }}"><input type="hidden" name="path" value="{{ entry.path }}"><label class="confirm-restore"><input type="checkbox" name="confirm" value="yes" required> Replace current path with this backup</label><button class="button danger">Restore</button></form></div>{% endif %}</div>{% endfor %}
+</section><p><a class="button secondary" href="{{ url_for('meld_dashboard') }}">Back to Backups</a> <a class="button secondary" href="{{ url_for('dashboard') }}">Back to Dashboard</a></p>
+{% endblock %}

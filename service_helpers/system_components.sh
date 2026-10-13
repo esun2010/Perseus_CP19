@@ -4,7 +4,7 @@ if [[ $(uname -s) == FreeBSD ]]; then
     source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/platforms/FreeBSD/service_helpers/system_components.sh"
     return $?
 fi
-# Non-daemon Linux components. Source this file; invoke through misc/system_hardening.sh.
+# Non-daemon Linux components. Source this file; invoke through main/system_hardening.sh.
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO_DIR/main/logging.sh"
 source "$REPO_DIR/service_helpers/distribution.sh"

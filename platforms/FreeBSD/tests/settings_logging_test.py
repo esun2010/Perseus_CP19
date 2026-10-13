@@ -17,7 +17,7 @@ class SettingsLoggingTests(unittest.TestCase):
                 target.write_text(before)
             (base / 'replacement').write_text(after)
             result = subprocess.run(['bash', '-c', '''
-source "$REPO/logging.sh"
+source "$REPO/main/logging.sh"
 LOG_FILE="$FIXTURE/log"
 CP_BACKUP_ROOT="$FIXTURE/backups"
 edit() { cp "$FIXTURE/replacement" "$TARGET"; return "$EDIT_STATUS"; }

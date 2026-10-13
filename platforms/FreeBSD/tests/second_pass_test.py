@@ -14,9 +14,11 @@ class SecondPassTest(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory(prefix='cp-second-pass-')
         self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
-        for name in ('service_helpers','input','log','etc','media','groups'):
+        for name in ('service_helpers','input','log','etc','media','groups','main'):
             (self.root/name).mkdir()
-        (self.root/'logging.sh').write_text(read_source('logging.sh'))
+        logging=read_source('main/logging.sh')
+        (self.root/'logging.sh').write_text(logging)
+        (self.root/'main/logging.sh').write_text(logging)
         for name in ('second_pass_accounts.sh','second_pass_media.sh'):
             text=read_source('service_helpers/' + name)
             text=text.replace('/usr/local/etc','@@ETC@@').replace('/etc/sudoers','@@ETC@@/sudoers').replace('/etc/doas.conf','@@ETC@@/doas.conf').replace('@@ETC@@',str(self.root/'etc'))

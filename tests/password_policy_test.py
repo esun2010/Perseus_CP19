@@ -20,10 +20,12 @@ class PasswordPolicyTest(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix='cp-password-policy-')
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        for name in ('etc/pam.d', 'var/lib/pam', 'usr/share/pam-configs', 'service_helpers'):
+        for name in ('etc/pam.d', 'var/lib/pam', 'usr/share/pam-configs', 'service_helpers', 'main'):
             (self.root / name).mkdir(parents=True)
         shutil.copytree(ROOT / 'password_management', self.root / 'password_management')
-        shutil.copy(ROOT / 'logging.sh', self.root / 'logging.sh')
+        logging = (ROOT / 'main/logging.sh').read_text().replace('/etc', str(self.root / 'etc'))
+        (self.root / 'logging.sh').write_text(logging)
+        (self.root / 'main/logging.sh').write_text(logging)
         # Real backups and file edits; replace only host-dependent permission work.
         (self.root / 'service_helpers/permissions.sh').write_text('''
 secure_path() { chmod 644 "$1"; }

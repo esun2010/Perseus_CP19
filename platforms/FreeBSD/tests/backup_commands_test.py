@@ -16,7 +16,7 @@ class BackupCommandsTest(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix='cp-backup-commands-')
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        for name in ('input', 'misc', 'password_management', 'service_helpers',
+        for name in ('input', 'config', 'main', 'password_management', 'service_helpers',
                      'etc/lightdm', 'etc/security', 'etc/ufw', 'etc/default', 'etc/systemd/system'):
             (self.root / name).mkdir(parents=True, exist_ok=True)
         for name in ('passwd', 'shadow', 'master.passwd', 'group', 'gshadow', 'pwd.db', 'spwd.db',
@@ -24,11 +24,14 @@ class BackupCommandsTest(unittest.TestCase):
             (self.root / 'etc' / name).write_text('original fixture content\n')
         (self.root / 'input/auth_admins.txt').write_text('alice\nbob\n')
         # Only these copied files run. All absolute policy paths point into the fixture.
-        for name in ('logging.sh', 'service_helpers/permissions.sh', 'misc/login.sh'):
+        for name in ('service_helpers/permissions.sh', 'main/login.sh'):
             text = read_source(name).replace('/etc', str(self.root / 'etc'))
             text = text.replace('$EUID -ne 0', '0 -ne 0')
             text = text.replace('[[ -t 0 && -t 1 ]]', 'true')
             (self.root / name).write_text(text)
+        logging = read_source('main/logging.sh').replace('/etc', str(self.root / 'etc'))
+        (self.root / 'logging.sh').write_text(logging)
+        (self.root / 'main/logging.sh').write_text(logging)
         (self.root / 'service_helpers/platform.sh').write_text('''
 require_freebsd_root() { :; }
 require_commands() { :; }
@@ -69,12 +72,12 @@ systemctl() { [[ "$1" != is-active ]]; }
         return subprocess.run(['bash', str(self.root / name)], env=env, text=True, capture_output=True)
 
     def test_guest_changes_snapshot_each_database_update(self):
-        result = self.run_task('misc/login.sh')
+        result = self.run_task('main/login.sh')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual((self.root / 'calls').read_text().count('account change'), 2)
 
     def test_guest_changes_stop_on_backup_failure(self):
-        result = self.run_task('misc/login.sh', True)
+        result = self.run_task('main/login.sh', True)
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse((self.root / 'calls').exists())
 

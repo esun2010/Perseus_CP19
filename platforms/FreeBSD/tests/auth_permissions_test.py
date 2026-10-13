@@ -50,7 +50,7 @@ class AuthenticationPermissionsTest(unittest.TestCase):
         if not BSD:
             self.path('/lib64').mkdir()
             self.path('/lib64/security').symlink_to(self.path('/usr/lib64/security'))
-        (self.fixture / 'logging.sh').write_text(read_source('logging.sh'))
+        (self.fixture / 'logging.sh').write_text(read_source('main/logging.sh'))
         permissions = (ROOT / 'service_helpers/permissions.sh').read_text()
         # Replace only absolute policy roots, retaining the real helper control flow.
         permissions = re.sub(r'(?<![A-Za-z0-9_])/(?:usr|etc|var|lib64|lib)(?=/)',

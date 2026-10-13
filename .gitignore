@@ -8,6 +8,12 @@
 /main/all_logs(2).txt
 /log/webapp-runs/
 
+# Generated package/service comparison inventories and findings
+/compare/pkgs/unsafe_pkgs.txt
+/compare/services/unsafe_services.txt
+/compare/compare_pkgs.txt
+/compare/compare_services.txt
+
 # Dashboard state
 /main/.webapp_state.json
 

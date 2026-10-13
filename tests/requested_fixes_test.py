@@ -17,15 +17,17 @@ class RequestedFixesTest(unittest.TestCase):
         env.update(variables)
         return subprocess.run(['bash','-c',text],env=env,text=True,capture_output=True)
     def test_lightdm_absent_is_skipped_and_installed_configuration_is_seat_scoped(self):
-        (self.root/'misc').mkdir();(self.root/'etc').mkdir()
-        (self.root/'service_helpers').mkdir(); (self.root/'input').mkdir()
+        (self.root/'config').mkdir();(self.root/'etc').mkdir()
+        (self.root/'service_helpers').mkdir(); (self.root/'input').mkdir(); (self.root/'main').mkdir()
         (self.root/'input/distribution.txt').write_text('auto\n')
         (self.root/'etc/os-release').write_text('ID=ubuntu\nVERSION_CODENAME=noble\n')
         for name in ('distribution.sh','login_manager.sh'):
             (self.root/'service_helpers'/name).write_text((ROOT/'service_helpers'/name).read_text().replace('/etc',str(self.root/'etc')))
-        (self.root/'logging.sh').write_text((ROOT/'logging.sh').read_text())
-        script=(ROOT/'misc/login.sh').read_text().replace('/etc',str(self.root/'etc')).replace('/var/backups',str(self.root/'legacy-backups'))
-        (self.root/'misc/login.sh').write_text(script)
+        logging=(ROOT/'main/logging.sh').read_text().replace('/etc',str(self.root/'etc'))
+        (self.root/'logging.sh').write_text(logging)
+        (self.root/'main/logging.sh').write_text(logging)
+        script=(ROOT/'main/login.sh').read_text().replace('/etc',str(self.root/'etc')).replace('/var/backups',str(self.root/'legacy-backups'))
+        (self.root/'main/login.sh').write_text(script)
         mocks='''
 id() { if [[ "$1" == -u ]]; then echo 0; else return 1; fi; }
 dpkg-query() { if [[ "${@: -1}" == lightdm ]]; then printf '%s' "$LIGHTDM_STATUS"; else return 1; fi; }
@@ -34,18 +36,18 @@ chown() { :; }
 systemctl() { echo unexpected >> "$FIXTURE/restart"; return 99; }
 '''
         (self.root/'mocks.sh').write_text(mocks)
-        result=self.run_bash('bash "$FIXTURE/misc/login.sh"',BASH_ENV=str(self.root/'mocks.sh'),LIGHTDM_STATUS='absent')
+        result=self.run_bash('bash "$FIXTURE/main/login.sh"',BASH_ENV=str(self.root/'mocks.sh'),LIGHTDM_STATUS='absent')
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         self.assertFalse((self.root/'etc/lightdm').exists())
         (self.root/'etc/lightdm').mkdir()
         conf=self.root/'etc/lightdm/lightdm.conf';conf.write_text('[Seat:*]\nallow-guest=true\n[XDMCPServer]\nenabled=false\n')
-        result=self.run_bash('bash "$FIXTURE/misc/login.sh"',BASH_ENV=str(self.root/'mocks.sh'),LIGHTDM_STATUS='installed')
+        result=self.run_bash('bash "$FIXTURE/main/login.sh"',BASH_ENV=str(self.root/'mocks.sh'),LIGHTDM_STATUS='installed')
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         self.assertIn('[Seat:*]\nallow-guest=false\n[XDMCPServer]',conf.read_text())
         self.assertIn('[Seat:*]\nallow-guest=false',(self.root/'etc/lightdm/lightdm.conf.d/99-cyberpatriot-guest.conf').read_text())
         self.assertFalse((self.root/'restart').exists())
     def test_kernel_failures_propagate(self):
-        text=(ROOT/'misc/kernel.sh').read_text()
+        text=(ROOT/'main/kernel.sh').read_text()
         helpers=text[text.index('add_sysctl_setting() {'):text.index('###############################################################################\n# Administrator allowlist')]
         helpers+=text[text.index('harden_mountpoint() {'):text.index('write_fstab_entry() {')]
         (self.root/'kernel_helpers.sh').write_text(helpers)
@@ -84,14 +86,15 @@ configure_native_service openvpn
         self.assertIn('unmask openvpn-client@.service',calls)
         self.assertIn('enable openvpn-client@competition',calls)
     def test_package_cleanup_uses_exact_installed_status(self):
-        for name in ('rm_stuff','service_helpers','input'):(self.root/name).mkdir()
+        for name in ('rm_stuff','service_helpers','input','main'):(self.root/name).mkdir()
         (self.root/'logging.sh').write_text('log() { :; }\n')
-        (self.root/'rm_stuff/bad_pkg.sh').write_text((ROOT/'rm_stuff/bad_pkg.sh').read_text().replace('$EUID -ne 0','0 -ne 0'))
+        (self.root/'main/logging.sh').write_text('log() { :; }\n')
+        (self.root/'rm_stuff/bad_pkg.sh').write_text((ROOT/'rm_stuff/bad_pkg.sh').read_text().replace('$EUID -eq 0','0 -eq 0'))
         (self.root/'mocks.sh').write_text('''
 dpkg() { echo unexpected >> "$FIXTURE/dpkg-used"; return 99; }
 dpkg-query() { if [[ "${@: -1}" == nmap ]]; then echo installed; else echo config-files; fi; }
-apt-get() { :; }
-apt() { printf '%s\\n' "$*" >> "$FIXTURE/purges"; }
+apt-get() { printf '%s\\n' "$*" >> "$FIXTURE/purges"; }
+apt() { :; }
 ''')
         result=self.run_bash('bash "$FIXTURE/rm_stuff/bad_pkg.sh"',BASH_ENV=str(self.root/'mocks.sh'))
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)

@@ -1,6 +1,6 @@
 """Read native/shared sources into the older flat, isolated unit-test fixtures.
 
-Production layout and dispatch are exercised by tests/platform_integration_test.py.
+Production layout and dispatch are exercised by tests/distribution_test.py.
 """
 from pathlib import Path
 

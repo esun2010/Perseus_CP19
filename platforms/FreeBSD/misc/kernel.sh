@@ -84,7 +84,7 @@ configure_admin_access() {
             had_rule=1
         fi
         {
-            printf '// Managed by misc/kernel.sh from input/auth_admins.txt.\n'
+            printf '// Managed by main/kernel.sh from input/auth_admins.txt.\n'
             printf 'polkit.addAdminRule(function(action, subject) {\n    return ["unix-user:root"'
             for user in "${ADMIN_USERS[@]}"; do printf ', "unix-user:%s"' "$user"; done
             printf '];\n});\n'
@@ -92,7 +92,7 @@ configure_admin_access() {
     fi
     cp -p "$sudoers" "$backup/sudoers" || return 1
     {
-        printf '# Managed by misc/kernel.sh from input/auth_admins.txt.\n'
+        printf '# Managed by main/kernel.sh from input/auth_admins.txt.\n'
         printf '# Old include directives are deliberately inactive.\n'
         printf 'Defaults env_reset\nDefaults use_pty\nDefaults timestamp_timeout=0\n'
         printf 'root ALL=(ALL:ALL) ALL\n'

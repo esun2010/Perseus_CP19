@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from fixture_sources import read_source, SHARED
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 
 
 class ComponentsTest(unittest.TestCase):
@@ -25,7 +25,8 @@ class ComponentsTest(unittest.TestCase):
                           lambda m: str(self.system) + m[0], text)
             text = text.replace('/dev/pf', str(self.system / 'dev/pf'))
             (self.helpers / name).write_text(text)
-        (self.base / 'logging.sh').write_text('')
+        (self.base / 'main').mkdir()
+        (self.base / 'main/logging.sh').write_text('')
         self.prefix = f'''source '{self.helpers}/system_components.sh'
 require_freebsd_root() {{ :; }}
 init_logging() {{ :; }}
@@ -102,7 +103,7 @@ stat() {{
         rc = self.file('/etc/rc.conf', 'gateway_enable=YES\nipv6_gateway_enable=YES\n')
         override = self.file('/etc/rc.conf.local', 'gateway_enable=YES\n')
         sysconf = self.file('/etc/sysctl.conf', 'net.inet.ip.forwarding=1\nnet.inet6.ip6.forwarding=1\n')
-        kernel = (ROOT / 'misc/kernel.sh').read_text()
+        kernel = (ROOT / 'platforms/FreeBSD/misc/kernel.sh').read_text()
         funcs = kernel[kernel.index('write_sysctl_setting()'):kernel.index('source "$SCRIPT_DIR/../service_helpers/kernel_network.sh"')]
         funcs = funcs.replace('/etc/', str(self.system / 'etc') + '/')
         self.run_shell(f'''

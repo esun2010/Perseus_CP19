@@ -13,9 +13,11 @@ class SecondPassTest(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory(prefix='cp-second-pass-')
         self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
-        for name in ('service_helpers','input','log','etc','media','groups'):
+        for name in ('service_helpers','input','log','etc','media','groups','main'):
             (self.root/name).mkdir()
-        (self.root/'logging.sh').write_text((ROOT/'logging.sh').read_text())
+        logging=(ROOT/'main/logging.sh').read_text()
+        (self.root/'logging.sh').write_text(logging)
+        (self.root/'main/logging.sh').write_text(logging)
         for name in ('second_pass_accounts.sh','second_pass_media.sh'):
             text=(ROOT/'service_helpers'/name).read_text()
             text=text.replace('/usr/local/etc','@@ETC@@').replace('/etc/sudoers','@@ETC@@/sudoers').replace('/etc/doas.conf','@@ETC@@/doas.conf').replace('@@ETC@@',str(self.root/'etc'))
@@ -143,7 +145,7 @@ fi
 
     def test_second_launcher_requires_reviews_and_stops_on_task_failure(self):
         (self.root/'service_helpers/distribution.sh').write_text('load_distribution() { CP_DISTRO=ubuntu; }\n')
-        (self.root/'run_all_2.sh').write_text((ROOT/'run_all_2.sh').read_text())
+        (self.root/'run_all_2.sh').write_text((ROOT/'main/run_all_2.sh').read_text())
         helper=self.root/'service_helpers/second_pass_accounts.sh'
         with helper.open('a') as f:f.write('\naccount_platform_init() { ACCOUNT_PLATFORM=linux; }\n')
         result=self.run_script('bash "$FIXTURE/run_all_2.sh"')

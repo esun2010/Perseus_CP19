@@ -32,7 +32,7 @@ h1 { margin: 0 0 4px; font-size: clamp(1.45rem, 3vw, 2rem); }
 .script-label strong { color: var(--text); font-size: 1rem; }
 .script-label span { color: var(--muted); font-size: .84rem; overflow-wrap: anywhere; }
 .run-controls { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex: 0 0 auto; }
-.status-message { min-width: 120px; text-align: right; color: var(--muted); transition: opacity .2s ease; }
+.status-message { min-width: 120px; max-width: 360px; text-align: right; color: var(--muted); overflow-wrap: anywhere; transition: opacity .2s ease; }
 .status-message.fade-out { opacity: 0; }
 .status-message.fade-in { animation: fade-in .22s ease both; }
 .run-button, .button { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; padding: 8px 14px; border: 1px solid rgba(255,255,255,.75); border-radius: 8px; color: white; font: inherit; font-weight: 650; text-decoration: none; cursor: pointer; transition: background-color .2s ease, border-color .2s ease, transform .12s ease, opacity .2s ease, filter .2s ease; }
@@ -46,6 +46,19 @@ h1 { margin: 0 0 4px; font-size: clamp(1.45rem, 3vw, 2rem); }
 .run-button:disabled { cursor: progress; }
 .button.secondary, .button.file-button { background: var(--surface-raised); }
 .button.save-button { background: var(--green); }
+.button.primary { background: var(--green); }
+.button.danger { background: var(--red); }
+.notice { margin: 0 0 16px; padding: 11px 14px; border: 1px solid white; border-radius: 9px; background: var(--surface-raised); animation: fade-in .2s ease both; overflow-wrap: anywhere; }
+.backup-form { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; }
+.backup-form label { display: grid; flex: 1 1 220px; gap: 5px; color: white; font-weight: 600; }
+.backup-form input, .backup-form select { min-height: 38px; padding: 7px 10px; border: 1px solid rgba(255,255,255,.75); border-radius: 8px; background: #555b60; color: white; font: inherit; }
+.backup-list { display: grid; gap: 9px; }
+.backup-item { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 10px 0; border-top: 1px solid rgba(255,255,255,.3); }
+.backup-item:first-child { border-top: 0; }
+.backup-item > div:first-child, .backup-item > span { display: grid; min-width: 0; }
+.backup-item span { color: var(--muted); font-size: .86rem; overflow-wrap: anywhere; }
+.backup-item form { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.confirm-restore { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: .85rem; }
 .file-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .file-button { min-height: 34px; padding: 6px 10px; font-size: .83rem; overflow-wrap: anywhere; }
 .input-list { display: grid; gap: 4px; }

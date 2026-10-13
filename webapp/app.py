@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import hashlib
+import glob
 import json
 import os
-import platform
+import pwd
 import re
+import shutil
 import subprocess
+import sys
 import threading
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -17,8 +21,11 @@ from flask import Flask, abort, jsonify, redirect, render_template, request, url
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE_PATH = ROOT / "main" / ".webapp_state.json"
+BACKUP_ROOT = Path(os.environ.get("CYBERPATRIOT_WEB_BACKUP_DIR", Path.home() / ".local/share/cyberpatriot/config-backups")).expanduser()
+HELPER_PATH = ROOT / "main" / "dashboard_file_ops.py"
 STATE_LOCK = threading.RLock()
 RUNS: dict[str, dict[str, Any]] = {}
+COMPARE_LOCKS: dict[str, threading.Lock] = {}
 
 app = Flask(__name__, template_folder=str(ROOT / "webapp" / "templates"), static_folder=str(ROOT / "webapp" / "static"))
 app.secret_key = os.environ.get("CYBERPATRIOT_FLASK_SECRET", "local-cyberpatriot-dashboard")
@@ -26,24 +33,29 @@ app.secret_key = os.environ.get("CYBERPATRIOT_FLASK_SECRET", "local-cyberpatriot
 # Keep this order aligned with ORDER and SCRIPT_MAP in main/run_all.sh.
 TASKS = [
     {"id": "mal", "name": "ClamAV Scan", "script": "rm_stuff/clamav.sh", "logs": ["log/clamav.txt"]},
-    {"id": "ker", "name": "Kernel", "script": "misc/kernel.sh", "configs": ["/etc/sysctl.d/99-hardening.conf", "/etc/sysctl.conf", "/etc/sudoers", "/etc/polkit-1/rules.d/00-cyberpatriot-admins.rules", "/usr/local/etc/sudoers", "/usr/local/etc/polkit-1/rules.d", "/etc/rc.conf", "/etc/fstab"]},
-    {"id": "log", "name": "Guest Login", "script": "misc/login.sh", "configs": ["/etc/lightdm", "/etc/gdm3", "/etc/sddm.conf", "/usr/local/etc/lightdm"]},
-    {"id": "pol", "name": "Password Policy", "script": "password_management/pwd_policy.sh", "configs": ["/etc/login.defs", "/etc/security/pwquality.conf", "/etc/security/faillock.conf", "/etc/pam.d/common-auth", "/etc/pam.d/common-account", "/etc/pam.d/common-password", "/etc/pam.d/common-session", "/etc/pam.d/common-session-noninteractive", "/usr/share/pam-configs/cyberpatriot-faillock-preauth", "/usr/share/pam-configs/cyberpatriot-faillock-authfail", "/etc/pam.d/passwd", "/etc/login.conf", "/etc/login.conf.db"]},
+    {"id": "ker", "name": "Kernel", "script": "main/kernel.sh", "configs": ["/etc/sysctl.d/99-hardening.conf", "/etc/sysctl.conf", "/etc/sudoers", "/etc/polkit-1/rules.d/00-cyberpatriot-admins.rules", "/usr/local/etc/sudoers", "/usr/local/etc/polkit-1/rules.d", "/etc/rc.conf", "/etc/fstab"]},
+    {"id": "log", "name": "Guest Login", "script": "main/login.sh", "configs": ["/etc/lightdm", "/etc/gdm3", "/etc/sddm.conf", "/usr/local/etc/lightdm", "/etc/passwd", "/etc/shadow", "/etc/group", "/etc/gshadow", "/etc/passwd-", "/etc/shadow-", "/etc/group-", "/etc/gshadow-", "/etc/master.passwd", "/etc/pwd.db", "/etc/spwd.db"]},
+    {"id": "pol", "name": "Password Policy", "script": "password_management/pwd_policy.sh", "configs": ["/etc/login.defs", "/etc/security/pwquality.conf", "/etc/security/faillock.conf", "/etc/pam.d/common-auth", "/etc/pam.d/common-account", "/etc/pam.d/common-password", "/etc/pam.d/common-session", "/etc/pam.d/common-session-noninteractive", "/usr/share/pam-configs/cyberpatriot-faillock-preauth", "/usr/share/pam-configs/cyberpatriot-faillock-authfail", "/etc/pam.d/passwd", "/etc/login.conf", "/etc/login.conf.db", "/etc/apt", "/var/lib/pam"]},
     {"id": "usr", "name": "User Audit", "script": "user_management/user_management.sh", "logs": ["log/unauth_users(2).txt", "log/unauth_admins(2).txt"], "edit_lists": [("Edit Authorized Users", "input/auth_users.txt"), ("Edit Authorized Admins", "input/auth_admins.txt")], "second": {"name": "User Cleanup", "script": "user_management/user_management_2.sh", "logs": ["log/user_management(2).txt"], "configs": ["/etc/passwd", "/etc/shadow", "/etc/group", "/etc/gshadow", "/etc/passwd-", "/etc/shadow-", "/etc/group-", "/etc/gshadow-", "/etc/master.passwd", "/etc/pwd.db", "/etc/spwd.db"]}},
     {"id": "mp3", "name": "Media Inventory", "script": "rm_stuff/rm_mp3+.sh", "logs": ["log/media_files(2).txt"], "second": {"name": "Media Cleanup", "script": "rm_stuff/rm_mp3+_2.sh", "logs": ["log/media_cleanup(2).txt"]}},
     {"id": "pkg", "name": "Bad Packages", "script": "rm_stuff/bad_pkg.sh", "edit_packages": True, "configs": ["/etc", "/usr/local/etc"]},
-    {"id": "per", "name": "File Permissions", "script": "misc/file_permissions.sh", "configs": ["/etc/sudoers", "/etc/ssh/sshd_config", "/etc/crontab", "/etc/fstab", "/etc/hosts", "/etc/hostname", "/etc/master.passwd", "/etc/passwd", "/etc/group", "/etc/pwd.db", "/usr/local/etc/pam.d"], "logs": ["log/world_files.txt", "log/world_files.txt.errors"]},
-    {"id": "sys", "name": "System Components", "script": "misc/system_hardening.sh", "configs": ["/etc/nsswitch.conf", "/etc/ssl/openssl.cnf", "/etc/ssl/private", "/etc/default/grub", "/boot/grub/grub.cfg", "/boot/grub2/grub.cfg", "/etc/selinux/config", "/etc/ufw", "/etc/iptables", "/etc/nftables.conf", "/etc/dhcp/dhclient.conf", "/etc/dhcp/dhclient-enter-hooks.d", "/etc/dhcp/dhclient-exit-hooks.d"]},
+    {"id": "per", "name": "File Permissions", "script": "main/file_permissions.sh", "configs": ["/etc", "/usr/local/etc", "/usr/lib/systemd/system", "/usr/share/ca-certificates", "/usr/share/certs", "/etc/pki", "/usr/local/share/ca-certificates", "/usr/local/share/certs", "/lib/security", "/lib64/security", "/usr/lib/security", "/usr/lib64/security", "/boot/grub/grub.cfg", "/boot/grub2/grub.cfg", "/boot/efi/EFI/ubuntu/grub.cfg", "/boot/efi/EFI/centos/grub.cfg", "/boot/efi/EFI/redhat/grub.cfg", "/boot/loader/entries", "/etc/rc.d", "/usr/local/etc/rc.d", "/etc/rc.conf.d", "/usr/local/etc/rc.conf.d"], "logs": ["log/world_files.txt", "log/world_files.txt.errors"]},
+    {"id": "sys", "name": "System Components", "script": "main/system_hardening.sh", "configs": ["/etc/nsswitch.conf", "/etc/ssl/openssl.cnf", "/etc/ssl/private", "/etc/ssl/certs", "/etc/ssl/untrusted", "/etc/default/grub", "/boot/grub/grub.cfg", "/boot/grub2/grub.cfg", "/boot/loader.conf", "/boot/loader.conf.local", "/boot/loader.rc", "/boot/loader.conf.d", "/boot/loader/entries", "/etc/selinux/config", "/etc/ufw", "/etc/iptables", "/etc/nftables.conf", "/etc/dhcp/dhclient.conf", "/etc/dhcp/dhclient-enter-hooks.d", "/etc/dhcp/dhclient-exit-hooks.d", "/etc/sysctl.conf", "/etc/rc.conf", "/etc/rc.conf.local", "/etc/fstab", "/etc/hosts", "/usr/lib/systemd/system", "/usr/share/ca-certificates", "/usr/share/certs", "/etc/pki", "/usr/local/share/ca-certificates", "/usr/local/share/certs", "/usr/local/etc/ssl/certs", "/etc/rc.d", "/usr/local/etc/rc.d", "/etc/rc.conf.d", "/usr/local/etc/rc.conf.d"]},
+    {"id": "cpkg", "name": "Package Comparison", "script": "compare/compare_pkgs.sh", "args": ["compare/pkgs/safe_pkgs.txt", "compare/pkgs/unsafe_pkgs.txt"], "logs": ["compare/compare_pkgs.txt"]},
+    {"id": "csvc", "name": "Service Comparison", "script": "compare/compare_services.sh", "args": ["compare/services/safe_services.txt", "compare/services/unsafe_services.txt"], "logs": ["compare/compare_services.txt"]},
 ]
 
 INPUT_FILES = [
-    "input/critical_services.txt",
     "input/distribution.txt",
+    "compare/pkgs/safe_pkgs.txt",
+    "compare/services/safe_services.txt",
 ]
 EDITABLE_INPUT_FILES = INPUT_FILES + ["input/auth_users.txt", "input/auth_admins.txt"]
 INPUT_EDITOR_DETAILS = {
     "input/auth_users.txt": ("Authorized Users", "Enter one authorized local username per line. Blank lines and lines beginning with # are ignored."),
     "input/auth_admins.txt": ("Authorized Admins", "Enter each username followed by its password on the next line. Keep each username and password together; scripts read usernames and ignore password lines."),
+    "compare/pkgs/safe_pkgs.txt": ("Trusted Package Reference", "Add one package name per line. Keep distribution-specific names; comparison results do not determine whether a package is safe."),
+    "compare/services/safe_services.txt": ("Trusted Service Reference", "Add one service name and expected boot state per line, such as ssh.service enabled. Allowed states are enabled and disabled."),
 }
 UPDATE_ACTION = {
     "id": "updates",
@@ -59,6 +71,61 @@ def _load_state() -> dict[str, Any]:
         return data if isinstance(data, dict) else {}
     except (OSError, ValueError):
         return {}
+
+
+def _distribution() -> str:
+    command = ["bash", "-c", 'source "$1"; load_distribution || exit 2; printf "%s" "$CP_DISTRO"', "distribution", str(ROOT / "service_helpers" / "distribution.sh")]
+    try:
+        result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, check=False)
+        return result.stdout.strip() if result.returncode == 0 else "unsupported"
+    except OSError:
+        return "unsupported"
+
+
+def _privilege_prefix() -> list[str]:
+    for manager in ("sudo", "doas"):
+        executable = shutil.which(manager)
+        if not executable:
+            continue
+        try:
+            available = subprocess.run([executable, "-n", "true"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            if available.returncode == 0:
+                return [executable, "-n"]
+        except OSError:
+            continue
+    graphical_privilege = shutil.which("pkexec")
+    if graphical_privilege and (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+        return [graphical_privilege]
+    return []
+
+
+def _helper(*args: str) -> dict[str, Any]:
+    try:
+        BACKUP_ROOT.mkdir(mode=0o700, parents=True, exist_ok=True)
+        os.chmod(BACKUP_ROOT, 0o700)
+        command = [*_privilege_prefix(), sys.executable, str(HELPER_PATH), "--backup-root", str(BACKUP_ROOT), "--uid", str(os.getuid()), "--gid", str(os.getgid()), *args]
+        result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, check=False)
+    except OSError as exc:
+        return {"error": str(exc)}
+    try:
+        data = json.loads(result.stdout or "{}")
+    except ValueError:
+        data = {"error": result.stderr.strip() or "File operation returned invalid output."}
+    if result.returncode and not data.get("error"):
+        data["error"] = result.stderr.strip() or "Privileged file operation failed; check sudo access and file permissions."
+    return data
+
+
+def _create_backup(paths: list[str], run_id: str, script: str) -> dict[str, Any]:
+    response = _helper("backup", "--run-id", run_id, "--script", script, *paths)
+    return response.get("backup", response)
+
+
+def _inspect_backup(backup_id: str) -> list[dict[str, Any]]:
+    response = _helper("inspect", "--id", backup_id)
+    if isinstance(response, list):
+        return response
+    return [{"path": "", "status": "error", "error": response.get("error", "Inspection failed")}]
 
 
 def _save_state(state: dict[str, Any]) -> None:
@@ -205,43 +272,110 @@ def _task_by_script(script: str) -> dict[str, Any] | None:
     return None
 
 
+def _config_candidates(script: str, task: dict[str, Any] | None) -> list[str]:
+    if not task:
+        return []
+    if task.get("second", {}).get("script") == script:
+        candidates = list(task["second"].get("configs", []))
+    else:
+        candidates = list(task.get("configs", []))
+    if script == "main/file_permissions.sh":
+        distro = _distribution()
+        login_files = [".bash_profile", ".bashrc", ".bash_login", ".profile", ".zshrc", ".bash_history", ".cshrc", ".login", ".history"]
+        try:
+            users = pwd.getpwall()
+        except OSError:
+            users = []
+        for user in users:
+            if distro == "freebsd":
+                if not (1000 <= user.pw_uid < 65534) or user.pw_shell.endswith(("/nologin", "/false")):
+                    continue
+                if not (user.pw_dir.startswith("/home/") or user.pw_dir.startswith("/usr/home/")):
+                    continue
+            elif user.pw_uid != 0 and not user.pw_shell.endswith(("/bash", "/zsh", "/sh", "/dash", "/ksh", "/fish", "/csh", "/tcsh")):
+                continue
+            home = Path(user.pw_dir)
+            if not home.is_dir() or home.is_symlink():
+                continue
+            for name in login_files:
+                path = home / name
+                if path.exists() and not path.is_symlink(): candidates.append(str(path))
+            ssh = home / ".ssh"
+            if ssh.is_dir() and not ssh.is_symlink():
+                candidates.append(str(ssh))
+                for name in ("authorized_keys", "config", "id_rsa", "id_ed25519"):
+                    path = ssh / name
+                    if path.exists() and not path.is_symlink(): candidates.append(str(path))
+        for pattern in ("/usr/lib/*-linux-gnu/security", "/lib/*-linux-gnu/security"):
+            candidates.extend(glob.glob(pattern))
+    # Directory snapshots cover their descendants, so avoid duplicating those
+    # trees as separate backups while keeping standalone files explicit.
+    ordered = sorted(set(candidates), key=lambda item: (len(Path(item).parts), item))
+    roots: list[Path] = []
+    result: list[str] = []
+    for raw in ordered:
+        path = Path(raw)
+        if any(path != parent and parent in path.parents for parent in roots):
+            continue
+        result.append(raw)
+        if path.is_dir() and not path.is_symlink(): roots.append(path)
+    return result
+
+
 def _run_update_steps(run_id: str) -> list[str]:
     env = os.environ.copy()
     env["PATH"] = "/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/sbin:/usr/local/bin"
     env["ROOT"] = str(ROOT)
-    distro = "freebsd" if platform.system() == "FreeBSD" else "linux"
+    distro = _distribution()
     if distro == "freebsd":
         steps = 'source "$ROOT/main/logging.sh"; init_logging; source "$ROOT/service_helpers/startup_repair.sh"; startup_repair; pkg -N >/dev/null 2>&1 || pkg bootstrap -y; pkg update; backup_package_configuration; pkg upgrade'
+    elif distro in ("ubuntu", "debian", "mint"):
+        steps = 'source "$ROOT/main/logging.sh"; init_logging; source "$ROOT/service_helpers/startup_repair.sh"; startup_repair; apt-get update; backup_package_configuration; apt-get upgrade'
     else:
-        steps = 'source "$ROOT/main/logging.sh"; init_logging; source "$ROOT/service_helpers/startup_repair.sh"; startup_repair; sudo apt update; backup_package_configuration; sudo apt upgrade'
+        raise RuntimeError("The existing distribution detector could not identify a supported system; update action was not run.")
     output_path = ROOT / "log" / "webapp-runs" / f"{run_id}.log"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("ab") as output:
         command = ["bash", "-c", "set -euo pipefail; " + steps]
         output.write(("$ " + " ".join(command) + "\n").encode())
         output.flush()
-        proc = subprocess.run(command, cwd=ROOT, env=env, stdout=output, stderr=subprocess.STDOUT, check=False)
+        privilege = _privilege_prefix()
+        if not privilege:
+            raise RuntimeError("Configure sudo or doas, or launch from a graphical Linux session with pkexec available; Flask remains unprivileged.")
+        proc = subprocess.run([*privilege, *command], cwd=ROOT, env=env, stdout=output, stderr=subprocess.STDOUT, check=False)
         if proc.returncode != 0:
             raise subprocess.CalledProcessError(proc.returncode, command)
     return [str(output_path.relative_to(ROOT))]
 
 
 def _execute_script(script: str, run_id: str) -> None:
-    config_candidates = []
+    if script in {"compare/compare_pkgs.sh", "compare/compare_services.sh"}:
+        lock = COMPARE_LOCKS.setdefault(script, threading.Lock())
+        with lock:
+            _execute_script_impl(script, run_id)
+        return
+    _execute_script_impl(script, run_id)
+
+
+def _execute_script_impl(script: str, run_id: str) -> None:
     task = _task_by_script(script)
-    if task:
-        if task.get("second", {}).get("script") == script:
-            config_candidates = list(task["second"].get("configs", []))
-        else:
-            config_candidates = list(task.get("configs", []))
+    config_candidates = _config_candidates(script, task)
     script_path = ROOT / script
-    command = ["bash", str(script_path)]
     if not script_path.is_file():
         _finish_run(script, run_id, 127, f"Missing script: {script}", {})
         return
-    before = _snapshot(config_candidates)
+    privilege = _privilege_prefix()
+    if not privilege:
+        _finish_run(script, run_id, 1, "Configure sudo or doas, or use a graphical Linux session with pkexec available; the Flask server stays unprivileged.", {})
+        return
+    script_args = task.get("args", []) if task and task.get("script") == script else task.get("second", {}).get("args", []) if task else []
+    command = [*privilege, "bash", str(script_path), *(str(ROOT / value) if not Path(value).is_absolute() else value for value in script_args)]
     output_path = ROOT / "log" / "webapp-runs" / f"{run_id}.log"
     try:
+        backup = _create_backup(config_candidates, run_id, script) if config_candidates else {"id": None}
+        if backup.get("error"):
+            _finish_run(script, run_id, 1, f"Backup failed; script was not run: {backup['error']}", {"backup_error": backup["error"]})
+            return
         output_path.parent.mkdir(parents=True, exist_ok=True)
         env = os.environ.copy()
         env["PATH"] = "/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/sbin:/usr/local/bin"
@@ -250,15 +384,15 @@ def _execute_script(script: str, run_id: str) -> None:
             if RUNS.get(script, {}).get("run_id") == run_id:
                 RUNS[script].update({"status": "Running", "message": "Running...", "exit_code": None, "pid": proc.pid, "output": str(output_path.relative_to(ROOT))})
             code = proc.wait()
-        after = _snapshot(config_candidates)
-        changed = [key for key, value in after.items() if value is not None and value != before.get(key)]
+        changes = _inspect_backup(backup["id"]) if backup.get("id") else []
+        changed = [entry["path"] for entry in changes if entry["status"] in ("changed", "created", "deleted")]
         if RUNS.get(script, {}).get("run_id") == run_id:
             with STATE_LOCK:
                 state = _load_state()
                 state.setdefault("modified", {})[script] = changed
                 _save_state(state)
         message = "Ran successfully" if code == 0 else "Failed"
-        _finish_run(script, run_id, code, message, {"output": str(output_path.relative_to(ROOT)), "modified": changed})
+        _finish_run(script, run_id, code, message, {"output": str(output_path.relative_to(ROOT)), "modified": changed, "backup_id": backup["id"], "changes": changes})
     except OSError as exc:
         _finish_run(script, run_id, 127, f"Failed to launch: {exc}", {})
 
@@ -279,7 +413,7 @@ def dashboard():
     update_status = _status("__updates__")
     update_files = _files_for_updates()
     aggregate = [name for name in ("main/all_logs.txt", "main/all_logs(2).txt") if _is_regular_view_file(name)]
-    return render_template("dashboard.html", tasks=_all_tasks(), inputs=INPUT_FILES, update=UPDATE_ACTION, update_status=update_status, update_files=update_files, aggregate=aggregate)
+    return render_template("dashboard.html", tasks=_all_tasks(), inputs=INPUT_FILES, update=UPDATE_ACTION, update_status=update_status, update_files=update_files, aggregate=aggregate, update_review=url_for("review_run", backup_id=update_status["backup_id"]) if update_status.get("backup_id") else None)
 
 
 @app.post("/run/<path:script>")
@@ -299,25 +433,28 @@ def run_script(script: str):
 
 
 def _execute_updates(run_id: str) -> None:
-    before = _snapshot(UPDATE_ACTION["configs"])
+    backup = _create_backup(UPDATE_ACTION["configs"], run_id, "Updates and APT Reset")
+    if backup.get("error"):
+        _finish_run("__updates__", run_id, 1, f"Backup failed; update was not run: {backup['error']}", {"backup_error": backup["error"]})
+        return
     output_path = ROOT / "log" / "webapp-runs" / f"{run_id}.log"
     if RUNS.get("__updates__", {}).get("run_id") == run_id:
         RUNS["__updates__"]["output"] = str(output_path.relative_to(ROOT))
     try:
         outputs = _run_update_steps(run_id)
         code, message = 0, "Ran successfully"
-    except (OSError, subprocess.CalledProcessError) as exc:
+    except (OSError, RuntimeError, subprocess.CalledProcessError) as exc:
         code = getattr(exc, "returncode", 127)
         outputs = [str(output_path.relative_to(ROOT))]
         message = f"Failed (exit {code})"
-    after = _snapshot(UPDATE_ACTION["configs"])
-    changed = [key for key, value in after.items() if value is not None and value != before.get(key)]
+    changes = _inspect_backup(backup["id"])
+    changed = [entry["path"] for entry in changes if entry["status"] in ("changed", "created", "deleted")]
     if RUNS.get("__updates__", {}).get("run_id") == run_id:
         with STATE_LOCK:
             state = _load_state()
             state.setdefault("modified", {})["__updates__"] = changed
             _save_state(state)
-    _finish_run("__updates__", run_id, code, message, {"output": outputs[0] if outputs else None, "modified": changed})
+    _finish_run("__updates__", run_id, code, message, {"output": outputs[0] if outputs else None, "modified": changed, "backup_id": backup["id"], "changes": changes})
 
 
 @app.get("/status/<path:script>")
@@ -455,5 +592,127 @@ def dashboard_data():
     return jsonify({"tasks": _all_tasks()})
 
 
+def _catalog() -> list[dict[str, Any]]:
+    try:
+        data = json.loads((BACKUP_ROOT / "catalog.json").read_text(encoding="utf-8"))
+        return list(reversed(data.get("backups", [])))
+    except (OSError, ValueError):
+        return []
+
+
+def _meld_available() -> str | None:
+    path = shutil.which("meld")
+    return path if path and os.access(path, os.X_OK) else None
+
+
+def _launch_meld(left: Path, right: Path, directory: bool = False) -> str | None:
+    meld = _meld_available()
+    if not meld:
+        return "Meld is not installed or is not executable. Run ./setup.sh or install Meld for this operating system."
+    if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+        return "Meld could not open: no graphical desktop session is available to the Flask process (DISPLAY/WAYLAND_DISPLAY is missing)."
+    if not left.exists() or not right.exists():
+        return "Both comparison paths must exist."
+    if left.is_symlink() or right.is_symlink():
+        return "Symbolic-link comparison inputs are not supported."
+    if directory:
+        if not left.is_dir() or not right.is_dir(): return "Directory comparison requires two existing directories."
+        if not os.access(left, os.R_OK | os.X_OK) or not os.access(right, os.R_OK | os.X_OK): return "A selected directory is not readable."
+    else:
+        if not left.is_file() or not right.is_file(): return "File comparison requires two existing regular files."
+        if not os.access(left, os.R_OK) or not os.access(right, os.R_OK): return "A selected file is not readable."
+    try:
+        subprocess.Popen([meld, str(left), str(right)], cwd=ROOT, env=os.environ.copy(), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    except OSError as exc:
+        return f"Could not launch Meld: {exc}"
+    return None
+
+
+def _comparison_page(message: str | None = None, *, code: int = 200):
+    return render_template("meld.html", message=message, backups=_catalog(), distribution=_distribution(), meld_installed=bool(_meld_available())), code
+
+
+@app.get("/meld")
+def meld_dashboard():
+    return _comparison_page()
+
+
+def _submitted_path(name: str) -> Path:
+    raw = request.form.get(name, "").strip()
+    if not raw:
+        raise ValueError(f"Choose a path for {name}.")
+    path = Path(raw)
+    if not path.is_absolute() or ".." in path.parts:
+        raise ValueError("Paths must be absolute and must not contain parent traversal.")
+    if path.is_symlink():
+        raise ValueError("Symbolic-link paths are not supported.")
+    try:
+        path = path.resolve(strict=True)
+    except OSError as exc:
+        raise ValueError(f"Path does not exist or cannot be resolved: {raw} ({exc})") from None
+    return path
+
+
+@app.post("/meld/compare")
+def compare_paths():
+    try:
+        left, right = _submitted_path("left"), _submitted_path("right")
+        kind = request.form.get("kind")
+        if kind not in ("files", "directories"): raise ValueError("Choose files or directories.")
+        error = _launch_meld(left, right, kind == "directories")
+        return _comparison_page(error or "Meld comparison launched.", code=400 if error else 200)
+    except ValueError as exc:
+        return _comparison_page(str(exc), code=400)
+
+
+@app.post("/meld/backup")
+def create_manual_backup():
+    try:
+        path = _submitted_path("path")
+        if path.is_symlink() or not (path.is_file() or path.is_dir()): raise ValueError("Choose an existing regular file or directory.")
+        run_id = f"manual-{int(time.time())}-{uuid.uuid4().hex[:8]}"
+        result = _create_backup([str(path)], run_id, "Manual backup")
+        if result.get("error"): return _comparison_page(f"Backup failed: {result['error']}", code=500)
+        return _comparison_page(f"Backup created: {result['id']} for {path}")
+    except ValueError as exc:
+        return _comparison_page(str(exc), code=400)
+
+
+@app.get("/meld/review/<backup_id>")
+def review_run(backup_id: str):
+    results = _inspect_backup(backup_id)
+    if len(results) == 1 and results[0].get("status") == "error": return _comparison_page(results[0].get("error"), code=404)
+    record = next((item for item in _catalog() if item["id"] == backup_id), None)
+    if record is None:
+        return _comparison_page("Backup record is unavailable.", code=404)
+    return render_template("backup_review.html", record=record, results=results, message=None)
+
+
+@app.post("/meld/compare-backup")
+def compare_backup():
+    backup_id, raw_path = request.form.get("backup_id", ""), request.form.get("path", "")
+    result = _helper("stage", "--id", backup_id, "--path", raw_path)
+    if result.get("error"): return _comparison_page(f"Could not stage comparison: {result['error']}", code=400)
+    error = _launch_meld(Path(result["before"]), Path(result["current"]), bool(result.get("directory")))
+    if error: return _comparison_page(error, code=400)
+    return _comparison_page(f"Meld comparison launched for {raw_path}.")
+
+
+@app.post("/meld/restore")
+def restore_backup():
+    backup_id, raw_path = request.form.get("backup_id", ""), request.form.get("path", "")
+    if request.form.get("confirm") != "yes": return _comparison_page("Confirm that restoration will replace the current file contents.", code=400)
+    record = next((item for item in _catalog() if item["id"] == backup_id), None)
+    if not record or not any(entry["path"] == raw_path and entry["existed"] for entry in record.get("entries", [])):
+        return _comparison_page("The selected backup does not contain an original version of that path.", code=404)
+    current_backup = _create_backup([raw_path], f"restore-{uuid.uuid4().hex[:8]}", "Pre-restore current version")
+    if current_backup.get("error"): return _comparison_page(f"Restore cancelled because the current version could not be backed up: {current_backup['error']}", code=500)
+    result = _helper("restore", "--id", backup_id, "--path", raw_path)
+    if result.get("error"): return _comparison_page(f"Restore failed: {result['error']}; current version backup: {current_backup['id']}", code=500)
+    return _comparison_page(f"Restored {raw_path}. Previous current version backup: {current_backup['id']}.")
+
+
 if __name__ == "__main__":
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        raise SystemExit("Do not run the Flask dashboard as root. Start it with ./setup.sh from your desktop user account.")
     app.run(host=os.environ.get("CYBERPATRIOT_HOST", "127.0.0.1"), port=int(os.environ.get("CYBERPATRIOT_PORT", "5000")), debug=False, threaded=True)

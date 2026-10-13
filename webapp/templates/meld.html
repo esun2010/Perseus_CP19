@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Meld and Configuration Backups{% endblock %}
+{% block body %}
+<div class="page-heading"><h1>Meld and Configuration Backups</h1><p>Compare files and directories, keep configuration snapshots, and review dashboard script changes.</p></div>
+{% if message %}<div class="notice" role="status">{{ message }}</div>{% endif %}
+<section class="panel"><div class="section-heading"><div><h2>Comparison tools</h2></div><span class="script-path">{{ distribution }} · {% if meld_installed %}Meld available{% else %}Meld unavailable{% endif %}</span></div>
+  <form class="backup-form" method="post" action="{{ url_for('compare_paths') }}"><label>First path<input name="left" type="text" required placeholder="/path/to/file-or-directory"></label><label>Second path<input name="right" type="text" required placeholder="/path/to/file-or-directory"></label><label>Compare as<select name="kind"><option value="files">Two files</option><option value="directories">Two directories</option></select></label><button class="button primary">Open Meld</button></form>
+</section>
+<section class="panel"><div class="section-heading"><div><h2>Back up a configuration path</h2></div><p>Existing files or directories are copied before you edit them elsewhere.</p></div>
+  <form class="backup-form" method="post" action="{{ url_for('create_manual_backup') }}"><label>Absolute path<input name="path" type="text" required placeholder="/etc/ssh/sshd_config"></label><button class="button primary">Create Backup</button></form>
+</section>
+<section class="panel"><div class="section-heading"><div><h2>Available backups</h2></div><p>Dashboard-run backups are created before scripts start.</p></div>
+  {% if backups %}<div class="backup-list">{% for backup in backups %}<div class="backup-item"><strong>{{ backup.script }}</strong><span>{{ backup.created_at }} · {{ backup.id }}</span><a class="button secondary" href="{{ url_for('review_run', backup_id=backup.id) }}">Review Changes</a></div>{% endfor %}</div>{% else %}<p>No configuration backups have been created.</p>{% endif %}
+</section>
+<p><a class="button secondary" href="{{ url_for('dashboard') }}">Back to Dashboard</a></p>
+{% endblock %}

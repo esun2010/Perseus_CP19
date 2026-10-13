@@ -20,7 +20,7 @@ class RequestedPathsTest(unittest.TestCase):
         return result.stdout
 
     def prelude(self):
-        return f'''source '{ROOT}/logging.sh'
+        return f'''source '{ROOT}/main/logging.sh'
 source '{ROOT}/service_helpers/permissions.sh'
 source '{ROOT}/service_helpers/path_hardening.sh'
 log() {{ :; }}
@@ -111,7 +111,7 @@ secure_boot_paths
         self.assertEqual(outside.stat().st_mode & 0o777, 0o666)
 
     def test_kernel_always_disables_forwarding(self):
-        script = (ROOT / 'misc/kernel.sh').read_text()
+        script = (ROOT / 'main/kernel.sh').read_text()
         start = script.index('# Forwarding changes reset')
         end = script.index('log "Sysctl hardening complete."')
         output = self.run_shell('add_sysctl_setting() { echo "$*"; }\n' + script[start:end])
@@ -126,7 +126,7 @@ secure_boot_paths
         self.assertNotIn('forwarding.txt', script)
 
     def test_forwarding_is_persisted_and_applied_idempotently(self):
-        script = (ROOT / 'misc/kernel.sh').read_text()
+        script = (ROOT / 'main/kernel.sh').read_text()
         functions = script[script.index('ensure_sysctl_file()'):script.index('load_admin_allowlist()')]
         config = self.base / 'hardening.conf'
         config.write_text('net.ipv4.ip_forward = 1\nnet.ipv6.conf.all.forwarding = 1\n')

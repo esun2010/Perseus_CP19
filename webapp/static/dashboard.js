@@ -19,12 +19,25 @@
     (files.configs || []).forEach((path) => add("Config", path));
   }
 
+  function renderReview(row, data) {
+    const container = row.parentElement.querySelector("[data-review-container]");
+    if (!container) return;
+    container.replaceChildren();
+    if (!data.backup_id) return;
+    const link = document.createElement("a");
+    link.className = "button secondary";
+    link.href = `/meld/review/${encodeURIComponent(data.backup_id)}`;
+    link.textContent = "Review Script Changes";
+    container.appendChild(link);
+  }
+
   async function refreshRow(row) {
     try {
       const response = await fetch(row.dataset.statusUrl, { cache: "no-store" });
       if (!response.ok) return;
       const data = await response.json();
       renderFiles(row, data.files);
+      renderReview(row, data);
       const button = row.querySelector("[data-run-url]");
       const message = row.querySelector("[data-status-message]");
       const nextClass = classFor(data.status);
@@ -33,7 +46,7 @@
         button.classList.add(nextClass);
         button.disabled = false;
       }
-      const text = labelFor(data.status);
+      const text = data.status === "Failed" && data.message ? data.message : labelFor(data.status);
       if (message && message.textContent.trim() !== text) {
         message.classList.remove("fade-in");
         message.classList.add("fade-out");

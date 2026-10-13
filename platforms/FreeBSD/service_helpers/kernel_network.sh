@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Requires logging helpers and apply_sysctl_setting from misc/kernel.sh.
+# Requires logging helpers and apply_sysctl_setting from main/kernel.sh.
 disable_forwarding() {
     local key file directory
     require_commands sysrc || return 1

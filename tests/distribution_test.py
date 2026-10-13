@@ -115,7 +115,7 @@ distribution_service_unit mysql''')
         import os
         env = dict(os.environ, BASH_ENV=str(mock))
         for name in ('run_all.sh', 'run_all_2.sh'):
-            (self.root/name).write_text((ROOT/name).read_text())
+            (self.root/name).write_text((ROOT/'main'/name).read_text())
             (native/name).write_text('echo NATIVE-'+name+'\n')
             result = subprocess.run(['bash', str(self.root/name)], env=env, text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)

@@ -5,7 +5,7 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 TEMP=$(mktemp -d "${TMPDIR:-/tmp}/cyberpatriot-backup-tests.XXXXXX")
 trap 'rm -rf "$TEMP"' EXIT
 export CP_BACKUP_ROOT="$TEMP/backups"
-source "$ROOT/logging.sh"
+source "$ROOT/../../main/logging.sh"
 source "$ROOT/service_helpers/permissions.sh"
 LOG_FILE="$TEMP/audit.log"
 passed=0
@@ -16,7 +16,7 @@ mode() {
     else command stat -c '%a' "$1"; fi
 }
 # Exercise the FreeBSD helper on Linux without changing its production stat calls.
-if [[ $(uname -s) != FreeBSD ]] && grep -q "stat -f '%Lp'" "$ROOT/../../logging.sh"; then
+if [[ $(uname -s) != FreeBSD ]] && grep -q "stat -f '%Lp'" "$ROOT/../../main/logging.sh"; then
     stat() {
         if [[ "$1" == -f ]]; then
             case "$2" in

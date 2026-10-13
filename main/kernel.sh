@@ -94,7 +94,7 @@ load_admin_allowlist() {
 write_admin_sudoers() {
     local user
     cat <<'SUDOERS'
-# Managed by misc/kernel.sh using input/auth_admins.txt.
+# Managed by main/kernel.sh using input/auth_admins.txt.
 # Deliberately no include directives: old grants must not bypass the allowlist.
 Defaults env_reset
 Defaults use_pty
@@ -109,7 +109,7 @@ SUDOERS
 write_admin_polkit() {
     local user
     cat <<'POLKIT'
-// Managed by misc/kernel.sh using input/auth_admins.txt.
+// Managed by main/kernel.sh using input/auth_admins.txt.
 polkit.addAdminRule(function(action, subject) {
     return ["unix-user:root"
 POLKIT

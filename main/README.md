@@ -53,18 +53,31 @@ This is a set of scripts to run for CyberPatriot Linux
 From the repository root, run `./setup.sh`. This single command creates or
 reuses the project `.venv`, installs or updates the website dependencies from
 `main/requirements.txt`, and starts the dashboard in the foreground. It
-does not run APT updates or CyberPatriot setup tasks. Enter your sudo password
-when prompted so the existing scripts can run with their required privileges. Open
-<http://127.0.0.1:5000> in a browser; press Ctrl+C in the terminal to stop the
-server. The dashboard runs with elevated privileges so its script buttons can
-perform their intended local practice operations.
+does not run APT updates or CyberPatriot setup tasks. Enter your sudo or doas
+password when prompted. The Flask server stays under your desktop account;
+script and protected-file operations use sudo/doas when available, with a
+graphical pkexec prompt as a Linux fallback. If none is configured, protected
+operations report the permission failure.
+Open <http://127.0.0.1:5000> in a browser; press Ctrl+C in the terminal to stop
+the server. Setup checks for Meld and attempts to install it with APT on Ubuntu,
+Debian, or Linux Mint, or `pkg` on FreeBSD when a compatible package is listed.
+If installation is unavailable, the dashboard continues to work and reports
+that Meld comparisons are unavailable. Meld needs an active graphical session
+(`DISPLAY` or `WAYLAND_DISPLAY`) inherited by the dashboard.
+If setup cannot install it, use `sudo apt-get install meld` or `doas apt-get install meld` on supported Debian-family systems. On FreeBSD, check with `pkg search meld` before installing with `sudo pkg install meld` or `doas pkg install meld`; availability depends on the configured repository for that release.
 
 The UI reads and writes the original files in `input/` and the package list in
 `rm_stuff/bad_pkg.sh`. It stores dashboard status in `main/.webapp_state.json` and
 per-run output under `log/webapp-runs/`; both are ignored by Git. Configuration
 buttons appear after the app observes a changed file during a dashboard-launched
-run. The interface is intended for local practice and should remain bound to
-localhost.
+run. Before a dashboard script runs, the app saves a unique configuration
+snapshot and associates it with that run; use **Review Script Changes** or the
+**Meld and Configuration Backups** section to compare changed, created, or
+deleted paths. Manual snapshots can be created before editing a configuration
+outside the dashboard. Backups are stored privately under
+`~/.local/share/cyberpatriot/config-backups` by default. Restore is separate from
+comparison, requires confirmation, and first saves the current version. The
+interface is intended for local practice and should remain bound to localhost.
 
 The authorized-user and authorized-admin lists are edited from buttons in the
 User Audit section. The files stay in `input/` and keep their original formats.
@@ -76,7 +89,7 @@ listed task; Enter resumes unfinished tasks. Package removal uses its fixed list
 without prompting. Select `mal` to install ClamAV and scan the filesystem; the
 transcript is saved to `log/clamav.txt`.
 
-The launcher, `misc` scripts and media-removal script append to
+The launcher, `main` hardening scripts and media-removal script append to
 `main/all_logs.txt`, regardless of the working directory. Configuration
 edits include old/new lines; service state, backups, permissions, firewall
 status and failures are logged. SSH/Apache validate before reloading and restore
@@ -100,7 +113,7 @@ Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
 
 | File | Description |
 | --- | --- |
-| `main/README.md` | Explains how to select tasks, configure critical services, run checks, and understand the project files. |
+| `main/README.md` | Explains how to select tasks, configure scenario reference lists, run checks, and understand the project files. |
 | `main/.gitattributes` | Tells Git to use Linux-style LF line endings for shell scripts. |
 | `main/run_all.sh` | Interactive CyberPatriot scoring tasks with saved progress. |
 | `main/all_logs.txt` | Stores the shared, accumulating audit log with script names. Scripts using the logging helper record configuration changes, permissions, actions, and failures here. |
@@ -110,13 +123,37 @@ Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
 
 | File | Description |
 | --- | --- |
-| `misc/system_hardening.sh` | Runs NSS, OpenSSL, GRUB, SELinux, Netfilter snapshot, and DHCP client checks together (`sys` in the launcher). |
-| `misc/kernel.sh` | Applies persistent and runtime sysctl hardening for networking and kernel protections. It also adjusts `/tmp` and `/dev/shm` permissions and mount options, including their existing fstab entries. |
-| `misc/file_permissions.sh` | Sets permissions on selected system files, directories, and user home directories. It also generates a report of world-writable files and directories. |
+| `main/system_hardening.sh` | Runs NSS, OpenSSL, GRUB, SELinux, Netfilter snapshot, and DHCP client checks together (`sys` in the launcher). |
+| `main/kernel.sh` | Applies persistent and runtime sysctl hardening for networking and kernel protections. It also adjusts `/tmp` and `/dev/shm` permissions and mount options, including their existing fstab entries. |
+| `main/file_permissions.sh` | Sets permissions on selected system files, directories, and user home directories. It also generates a report of world-writable files and directories. |
 | `password_management/pwd_policy.sh` | Creates/configures `login.defs`, `pwquality.conf` and `faillock.conf` for account defaults, password complexity and failed-login lockout. Enables and verifies PAM profiles, preserving backups and refusing incompatible custom stacks. |
 | `rm_stuff/rm_mp3+.sh` | Writes a read-only MP3/MOV/MP4 inventory to `log/media_files(2).txt`; reviewed removal is performed by `rm_stuff/rm_mp3+_2.sh` in the second launcher. |
 | `rm_stuff/bad_pkg.sh` | Removes installed matches from the fixed CyberPatriot package list without prompting. |
 | `rm_stuff/clamav.sh` | Scans the filesystem with ClamAV and writes output to `log/clamav.txt`. |
+
+### Package and service comparisons
+
+The dashboard's Package Comparison and Service Comparison tasks regenerate their
+current inventories on every run, then compare names/states with the editable
+reference files `compare/pkgs/safe_pkgs.txt` and
+`compare/services/safe_services.txt`. The package reference format is one
+package name per line. The service reference format is one service name and its
+expected boot state (`enabled` or `disabled`) per line. Blank lines and `#`
+comments are ignored. Findings are written to
+`compare/compare_pkgs.txt` and `compare/compare_services.txt`; the generated
+inventories are stored separately under `compare/pkgs/unsafe_pkgs.txt` and
+`compare/services/unsafe_services.txt`.
+
+The supplied reference files are empty. Add a reviewed baseline before using the
+results. Package names can differ between Ubuntu, Debian, Mint, and FreeBSD, so
+maintain separate trusted package lists when their names differ. The tools
+compare package names without versions, and compare service boot configuration
+without inferring it from whether a service is running. On systemd, static,
+generated, indirect, alias, and unknown unit states are treated as present but
+not comparable to enabled/disabled; masked units are treated as disabled.
+FreeBSD uses `service -r` for ordered service scripts and `service -e` for
+boot-enabled scripts. Findings are configuration differences, not claims that
+a package or service is malicious.
 
 ### User audit files
 
@@ -133,6 +170,8 @@ Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
 | File | Description |
 | --- | --- |
 | `tests/logging_test.sh` | Tests configuration-change logs, permission logs, and media-deletion success and failure handling using temporary files and mocked commands. It does not run system hardening. |
+| `tests/compare_tools_test.py` | Exercises package and service comparisons with mocked Debian-family and FreeBSD package/service commands. |
+| `tests/compare_dashboard_test.py` | Checks comparison dashboard entries and verifies static input paths are passed as separate subprocess arguments. |
 
 ### Generated text reports
 
@@ -156,7 +195,7 @@ The shared audit log is `main/all_logs.txt`.
 
 ## Sudo and polkit administrator allowlist
 
-Before running `misc/kernel.sh` (or selecting `ker` in the launcher), populate
+Before running `main/kernel.sh` (or selecting `ker` in the launcher), populate
 `input/auth_admins.txt` with each existing administrator username followed by
 its password on the next line. Readers ignore the password line.
 Blank lines and full-line comments are allowed. Empty lists, invalid names,
@@ -321,12 +360,6 @@ Healthy APT sources are left alone. Recognized malformed-source, conflicting-sig
 
 Run the fixture tests instead of executing hardening scripts on a development workstation. Actual native-host testing remains necessary.
 
-### Suspicious-services log
-
-`suspicious_services.txt` is a separate, private, timestamped log appended on every service-policy run, before services are disabled (including launcher resume). It reports installed packages and discovered services from a review catalog when their family is absent from `input/critical_services.txt`. For example, installed or running Apache is reported when `apache2` is not critical. Entries distinguish installed packages from runtime and boot state; disabled services are still listed for review. These findings indicate unnecessary exposure to investigate, not confirmed malware.
-
-The catalog includes the managed web, database, mail, file-sharing and VPN services, plus SSH, other FTP servers, Telnet/rsh/TFTP, NFS/rpcbind, SNMP, Avahi, printing, Redis, MongoDB, PostgreSQL, Tor, RDP/VNC, proxies, rsync, inetd/xinetd and container runtimes. The scan only logs findings; it does not expand the automatic disabling policy. Custom service names and unpackaged applications need manual review. Inventory errors are logged as incomplete and stop the service-policy run. Run `bash misc/suspicious_services.sh` as root for the audit alone.
-
 ### First-pass review and second-pass cleanup
 
 Populate `input/auth_users.txt` and `input/auth_admins.txt` first. At least one existing non-root administrator is required; administrator entries also count as authorized users. In `main/run_all.sh`, select `usr mp3` to generate the account and media inventories. These two first-pass tasks only report; they do not delete users or media. Other first-launcher tasks retain their existing behavior.
@@ -389,7 +422,7 @@ and [Mint archive components](https://packages.linuxmint.com/list.php?release=un
 
 ## Additional kernel and sensitive-path coverage
 
-`misc/kernel.sh` already applied ASLR (`kernel.randomize_va_space=2`), SYN cookies,
+`main/kernel.sh` already applied ASLR (`kernel.randomize_va_space=2`), SYN cookies,
 IPv4 accept/send redirect restrictions, source-route restrictions, reverse-path
 filtering, and the listed ICMP protections. It now also persists and verifies:
 
@@ -409,7 +442,7 @@ changing IPv4 forwarding resets some defaults; see the
 [Linux kernel IP sysctl documentation](https://kernel.org/doc/html/latest/networking/ip-sysctl.html).
 
 
-The existing `per` task (`misc/file_permissions.sh`) now also covers:
+The existing `per` task (`main/file_permissions.sh`) now also covers:
 
 | Paths | Action |
 | --- | --- |

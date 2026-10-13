@@ -213,12 +213,6 @@ Healthy APT sources are left alone. Recognized malformed-source, conflicting-sig
 
 Run the fixture tests instead of executing hardening scripts on a development workstation. Actual native-host testing remains necessary.
 
-### Suspicious-services log
-
-`suspicious_services.txt` is a separate, private, timestamped log appended on every service-policy run, before services are disabled (including launcher resume). It reports installed packages and discovered services from a review catalog when their family is absent from `input/critical_services.txt`. For example, installed or running Apache is reported when `apache2` is not critical. Entries distinguish installed packages from runtime and boot state; disabled services are still listed for review. These findings indicate unnecessary exposure to investigate, not confirmed malware.
-
-The catalog includes the managed web, database, mail, file-sharing and VPN services, plus SSH, other FTP servers, Telnet/rsh/TFTP, NFS/rpcbind, SNMP, Avahi, printing, Redis, MongoDB, PostgreSQL, Tor, RDP/VNC, proxies, rsync, inetd/xinetd and container runtimes. The scan only logs findings; it does not expand the automatic disabling policy. Custom service names and unpackaged applications need manual review. Inventory errors are logged as incomplete and stop the service-policy run. Run `bash misc/suspicious_services.sh` as root for the audit alone.
-
 ### First-pass review and second-pass cleanup
 
 Populate `input/auth_users.txt` and `input/auth_admins.txt` first. At least one existing non-root administrator is required; administrator entries also count as authorized users. In `main/run_all.sh`, select `usr mp3` to generate the account and media inventories. These two first-pass tasks only report; they do not delete users or media. Other first-launcher tasks retain their existing behavior.
@@ -247,7 +241,7 @@ service actions in these scripts, not arbitrary third-party package hooks.
 
 ## Native system-component hardening
 
-Select `sys` in the shared `main/run_all.sh`, or run `bash misc/system_hardening.sh`.
+Select `sys` in the shared `main/run_all.sh`, or run `bash main/system_hardening.sh`.
 The shared runner invokes all components below using the native FreeBSD backend.
 Legacy component keywords also select the entire combined task.
 
@@ -299,7 +293,7 @@ References: [FreeBSD routing](https://docs.freebsd.org/en/books/handbook/advance
 [DHCP client](https://docs.freebsd.org/en/books/handbook/network-servers/),
 [certificate management](https://man.freebsd.org/cgi/man.cgi?manpath=FreeBSD+12.4-RELEASE&query=certctl).
 
-Configuration edits made by `misc` scripts and their shared helpers append
+Configuration edits made by `main` hardening scripts and their shared helpers append
 setting-level entries to `main/all_logs.txt`: `changed SETTING from OLD to NEW` or
 `added SETTING with new value VALUE`. Each setting includes its file path and
 INI section where applicable. This covers sysctl and rc settings, LightDM,

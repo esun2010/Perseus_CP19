@@ -11,7 +11,7 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 TEMP=$(mktemp -d "${TMPDIR:-/tmp}/cyberpatriot-native.XXXXXX")
 trap 'rm -rf "$TEMP"' EXIT
 source "$ROOT/service_helpers/platform.sh"
-source "$ROOT/../../logging.sh"
+source "$ROOT/../../main/logging.sh"
 source "$ROOT/service_helpers/permissions.sh"
 LOG_FILE="$TEMP/audit.log"
 export CP_BACKUP_ROOT="$TEMP/backups"

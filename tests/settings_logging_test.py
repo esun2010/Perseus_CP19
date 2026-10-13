@@ -17,7 +17,7 @@ class SettingsLoggingTests(unittest.TestCase):
                 target.write_text(before)
             (base / 'replacement').write_text(after)
             result = subprocess.run(['bash', '-c', '''
-source "$REPO/logging.sh"
+source "$REPO/main/logging.sh"
 LOG_FILE="$FIXTURE/log"
 CP_BACKUP_ROOT="$FIXTURE/backups"
 edit() { cp "$FIXTURE/replacement" "$TARGET"; return "$EDIT_STATUS"; }
@@ -73,14 +73,14 @@ audit_file_change "$TARGET" edit
 
     def test_consolidated_runner_continues_and_reports_failure(self):
         result = subprocess.run(['bash', '-c', '''
-source "$REPO/misc/system_hardening.sh"
-service_init() { :; }
+source "$REPO/main/system_hardening.sh"
+component_init() { :; }
 log() { :; }
 component_main() { echo "$1"; [[ "$1" != grub ]]; }
 system_hardening_main
 '''], env=dict(os.environ, REPO=str(ROOT)), capture_output=True, text=True)
         self.assertEqual(result.returncode, 1, result.stderr)
-        self.assertEqual(result.stdout.splitlines(), ['nss', 'openssl', 'grub', 'selinux', 'netfilter', 'dhclient'])
+        self.assertEqual(result.stdout.splitlines(), ['[+] START', 'nss', 'openssl', 'grub', 'selinux', 'netfilter', 'dhclient'])
 
 
 if __name__ == '__main__':

@@ -6,6 +6,8 @@
     <p>Run the existing scoring scripts, review their files, and edit scenario inputs.</p>
   </div>
 
+  <section class="panel"><div class="section-heading"><div><h2>Meld and Configuration Backups</h2></div><a class="button secondary" href="{{ url_for('meld_dashboard') }}">Open Meld and Backups</a></div><p>Compare files or directories, create backups, review script changes, or restore a saved configuration.</p></section>
+
   <section class="panel update-panel" aria-labelledby="updates-title">
     <div class="section-heading">
       <div><span class="section-number">1</span><h2 id="updates-title">Updates and APT Reset</h2></div>
@@ -19,6 +21,7 @@
       {% for file in update_files.logs %}<a class="button file-button" href="{{ url_for('view_file', path=file) }}" target="_blank" rel="noopener">Log: {{ file }}</a>{% endfor %}
       {% for file in update_files.configs %}<a class="button file-button" href="{{ url_for('view_file', path=file) }}" target="_blank" rel="noopener">Config: {{ file }}</a>{% endfor %}
     </div>
+    <div class="file-actions" data-review-container>{% if update_review %}<a class="button secondary" href="{{ update_review }}">Review Script Changes</a>{% endif %}</div>
   </section>
 
   <section class="panel" aria-labelledby="inputs-title">
@@ -47,6 +50,7 @@
         {% for file in script_files.logs %}<a class="button file-button" href="{{ url_for('view_file', path=file) }}" target="_blank" rel="noopener">Log: {{ file }}</a>{% endfor %}
         {% for file in script_files.configs %}<a class="button file-button" href="{{ url_for('view_file', path=file) }}" target="_blank" rel="noopener">Config: {{ file }}</a>{% endfor %}
       </div>
+      <div class="file-actions" data-review-container>{% if script_status and script_status.backup_id %}<a class="button secondary" href="{{ url_for('review_run', backup_id=script_status.backup_id) }}">Review Script Changes</a>{% endif %}</div>
     </div>
     {% endfor %}
   </section>

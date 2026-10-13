@@ -14,6 +14,8 @@ except ImportError as exc:
 
 host = os.environ.get("CYBERPATRIOT_HOST", "127.0.0.1")
 port = int(os.environ.get("CYBERPATRIOT_PORT", "5000"))
+if hasattr(os, "geteuid") and os.geteuid() == 0:
+    raise SystemExit("Do not run the Flask dashboard as root. Start it with ./setup.sh from your desktop user account.")
 try:
     app.run(host=host, port=port, debug=False, threaded=True)
 except KeyboardInterrupt:
