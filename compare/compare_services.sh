@@ -3,14 +3,14 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd -P)"
-OUTPUT_FILE="$SCRIPT_DIR/compare_services.txt"
+OUTPUT_FILE="$ROOT_DIR/log/services_log.txt"
+REFERENCE_FILE="$SCRIPT_DIR/services/safe_services"
+INVENTORY_FILE="$SCRIPT_DIR/services/unsafe_services"
 
-usage() { echo "Usage: $0 <trusted-service-states> <current-inventory-file>" >&2; }
+usage() { echo "Usage: $0 (no arguments; uses safe_services, unsafe_services, services_log.txt)" >&2; }
 error() { echo "compare_services: $*" >&2; exit 1; }
 
-(( $# == 2 )) || { usage; exit 2; }
-REFERENCE_FILE=$1
-INVENTORY_FILE=$2
+(( $# == 0 )) || { usage; exit 2; }
 
 target_path() {
     local supplied=$1 parent base

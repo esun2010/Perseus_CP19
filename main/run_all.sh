@@ -15,16 +15,15 @@ source "$SCRIPT_DIR/service_helpers/task_paths.sh"
 # CyberPatriot scoring tasks.
 ORDER=(mal ker log pol usr mp3 pkg per sys)
 declare -A SCRIPT_MAP=(
-    [sys]=main/system_hardening.sh
-
-    [ker]=main/kernel.sh
-    [log]=main/login.sh
+    [sys]=config/system_hardening.sh
+    [ker]=config/kernel.sh
+    [log]=config/login.sh
+    [per]=config/file_permissions.sh
     [pol]=password_management/pwd_policy.sh
     [usr]=user_management/user_management.sh
     [mp3]=rm_stuff/rm_mp3+.sh
     [pkg]=rm_stuff/bad_pkg.sh
     [mal]=rm_stuff/clamav.sh
-    [per]=main/file_permissions.sh
 )
 declare -A DESCRIPTION=(
     [sys]='Check system components and protect their configuration'

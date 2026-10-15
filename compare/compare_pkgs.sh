@@ -3,14 +3,14 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd -P)"
-OUTPUT_FILE="$SCRIPT_DIR/compare_pkgs.txt"
+OUTPUT_FILE="$ROOT_DIR/log/pkgs_log.txt"
+REFERENCE_FILE="$SCRIPT_DIR/pkgs/safe_pkgs"
+INVENTORY_FILE="$SCRIPT_DIR/pkgs/unsafe_pkgs"
 
-usage() { echo "Usage: $0 <trusted-package-list> <current-inventory-file>" >&2; }
+usage() { echo "Usage: $0 (no arguments; uses safe_pkgs, unsafe_pkgs, pkgs_log.txt)" >&2; }
 error() { echo "compare_pkgs: $*" >&2; exit 1; }
 
-(( $# == 2 )) || { usage; exit 2; }
-REFERENCE_FILE=$1
-INVENTORY_FILE=$2
+(( $# == 0 )) || { usage; exit 2; }
 
 # Resolve target paths through their physical parent directories without
 # following the target itself. Comparison inputs and outputs may not be links.
