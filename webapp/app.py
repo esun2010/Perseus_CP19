@@ -279,7 +279,7 @@ def _config_candidates(script: str, task: dict[str, Any] | None) -> list[str]:
         candidates = list(task["second"].get("configs", []))
     else:
         candidates = list(task.get("configs", []))
-    if script == "main/file_permissions.sh":
+    if script == "config/file_permissions.sh":
         distro = _distribution()
         login_files = [".bash_profile", ".bashrc", ".bash_login", ".profile", ".zshrc", ".bash_history", ".cshrc", ".login", ".history"]
         try:
