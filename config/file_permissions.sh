@@ -9,7 +9,7 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_FILE="$(cd "$SCRIPT_DIR/.." && pwd)/log/world_files.txt"
-source "$SCRIPT_DIR/../main/logging.sh"
+source "$SCRIPT_DIR/../config/logging.sh"
 source "$SCRIPT_DIR/../service_helpers/permissions.sh"
 source "$SCRIPT_DIR/../service_helpers/path_hardening.sh"
 
