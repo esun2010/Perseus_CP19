@@ -6,7 +6,7 @@ fi
 # Lock the optional guest account and configure the selected display manager.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../main/logging.sh"
+source "$SCRIPT_DIR/../config/logging.sh"
 [[ $(id -u) == 0 ]] || { echo 'Run as root.' >&2; exit 1; }
 source "$SCRIPT_DIR/../service_helpers/distribution.sh"
 source "$SCRIPT_DIR/../service_helpers/login_manager.sh"
