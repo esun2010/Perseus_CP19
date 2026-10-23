@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Shared local-account audit and explicitly invoked second-pass cleanup.
 SECOND_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-source "$SECOND_ROOT/main/logging.sh"
+source "$SECOND_ROOT/config/logging.sh"
 
 account_platform_init() {
     case "$(uname -s)" in
