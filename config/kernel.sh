@@ -10,7 +10,7 @@ fi
 ###############################################################################
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../main/logging.sh"
+source "$SCRIPT_DIR/../config/logging.sh"
 SYSCTL_FILE="/etc/sysctl.d/99-hardening.conf"
 
 # Ensure root
