@@ -66,24 +66,45 @@ normalize_name() {
     printf '%s\n' "$name"
 }
 
-# Reference format: one service name and expected boot state (enabled or
-# disabled) per line. Runtime state is deliberately not part of this check.
+# Accept either the compact boot-state format:
+#   ssh.service enabled
+# or systemctl list-units table output:
+#   ● ssh.service loaded active running - OpenBSD Secure Shell server
+# In table format, compare runtime ACTIVE state (active vs inactive); LOAD,
+# SUB, JOB, DESCRIPTION, and the leading ● marker are ignored.
 declare -A EXPECTED=()
+REFERENCE_MODE=""
 line_number=0
 while IFS= read -r line || [[ -n "$line" ]]; do
     ((line_number += 1))
     line=${line%%#*}
-    read -r name state extra <<< "$line"
+    # systemctl may prefix failed units with a bullet marker.
+    line=${line#●}
+    read -r name second third _ <<< "$line"
     [[ -z "${name:-}" ]] && continue
-    [[ -n "${state:-}" && -z "${extra:-}" ]] || error "malformed trusted reference on line $line_number; use: service-name enabled|disabled"
-    state=${state,,}
-    [[ "$state" == enabled || "$state" == disabled ]] || error "invalid expected state on line $line_number (use enabled or disabled)"
+    [[ "${name^^}" == UNIT ]] && continue
+
+    if [[ "${second:-}" == loaded && -n "${third:-}" ]]; then
+        mode=runtime
+        state=${third,,}
+        [[ "$state" == active ]] && state=active || state=inactive
+    else
+        mode=boot
+        state=${second,,}
+        [[ "$state" == enabled || "$state" == disabled ]] || error "unrecognized reference line $line_number; expected 'service enabled|disabled' or systemctl list-units output"
+    fi
+
+    if [[ -n "$REFERENCE_MODE" && "$REFERENCE_MODE" != "$mode" ]]; then
+        error "trusted reference mixes boot-state and systemctl list-units formats"
+    fi
+    REFERENCE_MODE=$mode
     normalized=$(normalize_name "$name") || error "invalid service name on line $line_number: $name"
     if [[ -n "${EXPECTED[$normalized]+present}" && "${EXPECTED[$normalized]}" != "$state" ]]; then
         error "conflicting expected states for $normalized in trusted reference"
     fi
     EXPECTED[$normalized]=$state
 done < "$REFERENCE_FILE"
+[[ -n "$REFERENCE_MODE" ]] || error "trusted reference contains no service entries"
 for name in "${!EXPECTED[@]}"; do
     printf '%s %s\n' "$name" "${EXPECTED[$name]}"
 done | LC_ALL=C sort -k1,1 > "$work_dir/reference.normalized"
@@ -91,15 +112,24 @@ done | LC_ALL=C sort -k1,1 > "$work_dir/reference.normalized"
 raw_inventory="$work_dir/services.raw"
 case "$CP_DISTRO" in
     ubuntu|debian|mint)
-        systemctl list-unit-files --type=service --no-legend --no-pager > "$raw_inventory" || error "systemctl could not collect service unit-file states"
-        while read -r unit unit_state _; do
-            [[ "$unit" == *.service && -n "${unit_state:-}" ]] || continue
-            normalized=$(normalize_name "$unit") || continue
-            unit_state=${unit_state,,}
-            # Preserve the native state in the inventory. Only states that
-            # explicitly mean boot-enabled or boot-disabled are compared.
-            printf '%s %s\n' "$normalized" "$unit_state" >> "$inventory_tmp"
-        done < "$raw_inventory"
+        if [[ "$REFERENCE_MODE" == runtime ]]; then
+            systemctl list-units --type=service --all --no-legend --no-pager > "$raw_inventory" || error "systemctl could not collect service runtime states"
+            while read -r unit load_state active_state _; do
+                unit=${unit#●}
+                [[ "$unit" == *.service && -n "${active_state:-}" ]] || continue
+                normalized=$(normalize_name "$unit") || continue
+                [[ "${active_state,,}" == active ]] && active_state=active || active_state=inactive
+                printf '%s %s\n' "$normalized" "$active_state" >> "$inventory_tmp"
+            done < "$raw_inventory"
+        else
+            systemctl list-unit-files --type=service --no-legend --no-pager > "$raw_inventory" || error "systemctl could not collect service unit-file states"
+            while read -r unit unit_state _; do
+                [[ "$unit" == *.service && -n "${unit_state:-}" ]] || continue
+                normalized=$(normalize_name "$unit") || continue
+                unit_state=${unit_state,,}
+                printf '%s %s\n' "$normalized" "$unit_state" >> "$inventory_tmp"
+            done < "$raw_inventory"
+        fi
         ;;
     freebsd)
         service -r > "$work_dir/available.txt" || error "service -r could not collect ordered service scripts"
@@ -141,16 +171,21 @@ awk -v platform="$CP_DISTRO" '
                 continue
             }
             actual = current[name]
-            # systemd masked units cannot be enabled at boot. Static,
-            # generated, indirect, alias and unknown states are present but
-            # have no comparable enabled/disabled state.
-            if (platform != "freebsd") {
-                if (actual == "enabled-runtime") actual = "enabled"
-                if (actual == "disabled-runtime" || actual == "masked" || actual == "masked-runtime") actual = "disabled"
-                if (actual != "enabled" && actual != "disabled") actual = "other"
+            if (platform != "freebsd" && expected[name] ~ /^(active|inactive)$/) {
+                if (actual != "active") actual = "inactive"
+                if (actual == "active" && expected[name] == "inactive") print "[active] " name
+                else if (actual == "inactive" && expected[name] == "active") print "[inactive] " name
+            } else {
+                # In boot-state mode, systemd's non-toggleable states are
+                # present but cannot be compared as enabled/disabled.
+                if (platform != "freebsd") {
+                    if (actual == "enabled-runtime") actual = "enabled"
+                    if (actual == "disabled-runtime" || actual == "masked" || actual == "masked-runtime") actual = "disabled"
+                    if (actual != "enabled" && actual != "disabled") actual = "other"
+                }
+                if (actual == "enabled" && expected[name] == "disabled") print "[enabled] " name
+                else if (actual == "disabled" && expected[name] == "enabled") print "[disabled] " name
             }
-            if (actual == "enabled" && expected[name] == "disabled") print "[enabled] " name
-            else if (actual == "disabled" && expected[name] == "enabled") print "[disabled] " name
         }
         for (name in expected) if (!(name in current)) print "[missing] " name
     }
