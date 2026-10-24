@@ -4,8 +4,8 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd -P)"
 OUTPUT_FILE="$ROOT_DIR/log/services_log.txt"
-REFERENCE_FILE="$SCRIPT_DIR/services/safe_services"
-INVENTORY_FILE="$SCRIPT_DIR/services/unsafe_services"
+REFERENCE_FILE="$SCRIPT_DIR/services/safe_services.txt"
+INVENTORY_FILE="$SCRIPT_DIR/services/unsafe_services.txt"
 
 usage() { echo "Usage: $0 (no arguments; uses safe_services, unsafe_services, services_log.txt)" >&2; }
 error() { echo "compare_services: $*" >&2; exit 1; }
