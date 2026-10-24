@@ -4,8 +4,8 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd -P)"
 OUTPUT_FILE="$ROOT_DIR/log/pkgs_log.txt"
-REFERENCE_FILE="$SCRIPT_DIR/pkgs/safe_pkgs"
-INVENTORY_FILE="$SCRIPT_DIR/pkgs/unsafe_pkgs"
+REFERENCE_FILE="$SCRIPT_DIR/pkgs/safe_pkgs.txt"
+INVENTORY_FILE="$SCRIPT_DIR/pkgs/unsafe_pkgs.txt"
 
 usage() { echo "Usage: $0 (no arguments; uses safe_pkgs, unsafe_pkgs, pkgs_log.txt)" >&2; }
 error() { echo "compare_pkgs: $*" >&2; exit 1; }
