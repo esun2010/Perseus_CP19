@@ -84,7 +84,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     [[ -z "${name:-}" ]] && continue
     [[ "${name^^}" == UNIT ]] && continue
 
-    if [[ "${second:-}" == loaded && -n "${third:-}" ]]; then
+    if [[ ( "${second:-}" == loaded || "${second:-}" == not-found ) && -n "${third:-}" ]]; then
         mode=runtime
         state=${third,,}
         [[ "$state" == active ]] && state=active || state=inactive
