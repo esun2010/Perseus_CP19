@@ -36,8 +36,12 @@ read_authorized_list() {
         [[ -n "$line" ]] || continue
         [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_.-]*\$?$ ]] || { log "FAILED invalid username in $file"; return 1; }
         dest["$line"]=1
-        [[ "$file" == */auth_admins.txt ]] && skip_password=1
-    done < "$file"
+if [[ "$file" == */auth_admins.txt ]]; then
+    skip_password=1
+fi
+done < "$file"
+
+return 0
 }
 
 local_account_records() {
