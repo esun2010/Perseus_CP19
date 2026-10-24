@@ -80,11 +80,25 @@ normalize_name() {
 }
 
 while IFS= read -r line || [[ -n "$line" ]]; do
+    # Remove comments and surrounding whitespace.
     line=${line%%#*}
-    read -r line extra <<< "$line"
-    [[ -z "${line:-}" ]] && continue
-    [[ -z "${extra:-}" ]] || error "trusted reference must contain package names only (invalid line: $line $extra)"
-    normalized=$(normalize_name "$line") || error "invalid package name in trusted reference: $line"
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    [[ -z "$line" ]] && continue
+
+    # Accept apt list --installed output:
+    # package/repository,now version architecture [installed]
+    if [[ "$line" =~ ^([[:alnum:]][[:alnum:].+_-]*)/[^[:space:]]+[[:space:]] ]]; then
+        name="${BASH_REMATCH[1]}"
+    else
+        # Otherwise, require a plain package name.
+        read -r name extra <<< "$line"
+        [[ -z "${extra:-}" ]] ||
+            error "trusted reference contains unrecognized extra fields: $line"
+    fi
+
+    normalized=$(normalize_name "$name") ||
+        error "invalid package name in trusted reference: $name"
     printf '%s\n' "$normalized"
 done < "$REFERENCE_FILE" | LC_ALL=C sort -u > "$work_dir/reference.txt"
 
