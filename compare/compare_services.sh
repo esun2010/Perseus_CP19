@@ -10,7 +10,12 @@ INVENTORY_FILE="$SCRIPT_DIR/services/unsafe_services.txt"
 usage() { echo "Usage: $0 (no arguments; uses safe_services, unsafe_services, services_log.txt)" >&2; }
 error() { echo "compare_services: $*" >&2; exit 1; }
 
-(( $# == 0 )) || { usage; exit 2; }
+(( $# == 0 || $# == 2 )) || { usage; exit 2; }
+if (( $# == 2 )); then
+    REFERENCE_FILE=$1
+    INVENTORY_FILE=$2
+    OUTPUT_FILE="$(dirname -- "$SCRIPT_DIR")/compare/compare_services.txt"
+fi
 
 target_path() {
     local supplied=$1 parent base
@@ -104,7 +109,10 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     fi
     EXPECTED[$normalized]=$state
 done < "$REFERENCE_FILE"
-[[ -n "$REFERENCE_MODE" ]] || error "trusted reference contains no service entries"
+if [[ -z "$REFERENCE_MODE" ]]; then
+    if [[ -s "$REFERENCE_FILE" ]]; then error "trusted reference contains no service entries"; fi
+    REFERENCE_MODE=boot
+fi
 for name in "${!EXPECTED[@]}"; do
     printf '%s %s\n' "$name" "${EXPECTED[$name]}"
 done | LC_ALL=C sort -k1,1 > "$work_dir/reference.normalized"
@@ -157,27 +165,17 @@ mv -f -- "$inventory_tmp" "$INVENTORY_FILE" || error "cannot write current inven
 inventory_tmp=''
 
 awk -v platform="$CP_DISTRO" '
-    FILENAME == ARGV[1] {
-        expected[$1] = $2
-        next
-    }
-    {
-        current[$1] = $2
-    }
+    FILENAME == ARGV[1] { expected[$1] = $2; next }
+    { current[$1] = $2 }
     END {
         for (name in current) {
-            if (!(name in expected)) {
-                print "[extra] " name
-                continue
-            }
+            if (!(name in expected)) { print "[extra] " name; continue }
             actual = current[name]
             if (platform != "freebsd" && expected[name] ~ /^(active|inactive)$/) {
                 if (actual != "active") actual = "inactive"
                 if (actual == "active" && expected[name] == "inactive") print "[active] " name
                 else if (actual == "inactive" && expected[name] == "active") print "[inactive] " name
             } else {
-                # In boot-state mode, systemd's non-toggleable states are
-                # present but cannot be compared as enabled/disabled.
                 if (platform != "freebsd") {
                     if (actual == "enabled-runtime") actual = "enabled"
                     if (actual == "disabled-runtime" || actual == "masked" || actual == "masked-runtime") actual = "disabled"
@@ -187,9 +185,9 @@ awk -v platform="$CP_DISTRO" '
                 else if (actual == "disabled" && expected[name] == "enabled") print "[disabled] " name
             }
         }
-        for (name in expected) if (!(name in current)) print "[missing] " name
+        # Reference-only services are omitted because they are unavailable here.
     }
-' "$work_dir/reference.normalized" "$INVENTORY_FILE" | LC_ALL=C sort > "$output_tmp"
+'  "$work_dir/reference.normalized" "$INVENTORY_FILE" | LC_ALL=C sort > "$output_tmp"
 
 chmod 0644 "$output_tmp" || error "cannot set readable permissions on comparison findings"
 mv -f -- "$output_tmp" "$OUTPUT_FILE" || error "cannot write comparison findings: $OUTPUT_FILE"

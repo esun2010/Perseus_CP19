@@ -10,7 +10,12 @@ INVENTORY_FILE="$SCRIPT_DIR/pkgs/unsafe_pkgs.txt"
 usage() { echo "Usage: $0 (no arguments; uses safe_pkgs, unsafe_pkgs, pkgs_log.txt)" >&2; }
 error() { echo "compare_pkgs: $*" >&2; exit 1; }
 
-(( $# == 0 )) || { usage; exit 2; }
+(( $# == 0 || $# == 2 )) || { usage; exit 2; }
+if (( $# == 2 )); then
+    REFERENCE_FILE=$1
+    INVENTORY_FILE=$2
+    OUTPUT_FILE="$(dirname -- "$SCRIPT_DIR")/compare/compare_pkgs.txt"
+fi
 
 # Resolve target paths through their physical parent directories without
 # following the target itself. Comparison inputs and outputs may not be links.
@@ -114,9 +119,9 @@ chmod 0644 "$inventory_tmp" || error "cannot set readable permissions on current
 mv -f -- "$inventory_tmp" "$INVENTORY_FILE" || error "cannot write current inventory: $INVENTORY_FILE"
 inventory_tmp=''
 
-LC_ALL=C comm -13 "$work_dir/reference.txt" "$INVENTORY_FILE" | awk '{print "[extra] " $0}' > "$work_dir/extra.txt"
-LC_ALL=C comm -23 "$work_dir/reference.txt" "$INVENTORY_FILE" | awk '{print "[missing] " $0}' > "$work_dir/missing.txt"
-cat "$work_dir/extra.txt" "$work_dir/missing.txt" | LC_ALL=C sort > "$output_tmp"
+# The reference describes packages expected to be present; absent reference
+# entries are not findings because package sets vary by release and image.
+LC_ALL=C comm -13 "$work_dir/reference.txt" "$INVENTORY_FILE" | awk '{print "[extra] " $0}' > "$output_tmp"
 chmod 0644 "$output_tmp" || error "cannot set readable permissions on comparison findings"
 mv -f -- "$output_tmp" "$OUTPUT_FILE" || error "cannot write comparison findings: $OUTPUT_FILE"
 output_tmp=''

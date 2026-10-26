@@ -8,7 +8,7 @@ system_hardening_main() {
     (($# == 0)) || { echo 'This script accepts no arguments.' >&2; return 1; }
     component_init || return 1
     local component failed=0
-    for component in nss openssl grub selinux netfilter dhclient; do
+    for component in nss openssl grub selinux dhclient; do
         log "RUN system component: $component"
         if component_main "$component"; then
             log "PASS system component: $component"

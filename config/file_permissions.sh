@@ -8,7 +8,6 @@ fi
 # ---------------------------------
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OUTPUT_FILE="$(cd "$SCRIPT_DIR/.." && pwd)/log/world_files.txt"
 source "$SCRIPT_DIR/../config/logging.sh"
 source "$SCRIPT_DIR/../service_helpers/permissions.sh"
 source "$SCRIPT_DIR/../service_helpers/path_hardening.sh"
@@ -31,7 +30,7 @@ secure_auth_permissions || exit 1
 secure_local_login_files || exit 1
 secure_vendor_units_and_trust || exit 1
 secure_boot_paths || exit 1
-for service in ssh apache2 vsftpd ufw; do
+for service in ssh apache2 vsftpd; do
     secure_service_permissions "$service" || exit 1
 done
 
@@ -83,51 +82,6 @@ if [ -d /home ]; then
         fi
     done
 fi
-
-echo
-echo "[+] Searching for world-writable files and directories..."
-echo "    This may take a while."
-
-# Start the output file
-write_world_report() {
-{
-    echo "Linux World-Writable File/Directory Report"
-    echo "Generated: $(date)"
-    echo
-    echo "========================================"
-    echo "WORLD-WRITABLE FILES"
-    echo "========================================"
-    echo
-} > "$OUTPUT_FILE"
-
-# Find world-writable regular files
-find / \
-    \( -path /proc -o -path '/proc/*' -o -path '*/CyberPatriot_Linux_2026' -o -path '*/CyberPatriot_Linux_2026/*' \) -prune -o \
-    -type f \
-    -perm -0002 \
-    -print 2>/dev/null >> "$OUTPUT_FILE"
-
-{
-    echo
-    echo "========================================"
-    echo "WORLD-WRITABLE DIRECTORIES"
-    echo "========================================"
-    echo
-} >> "$OUTPUT_FILE"
-
-# Find world-writable directories
-find / \
-    \( -path /proc -o -path '/proc/*' -o -path '*/CyberPatriot_Linux_2026' -o -path '*/CyberPatriot_Linux_2026/*' \) -prune -o \
-    -type d \
-    -perm -0002 \
-    -print 2>/dev/null >> "$OUTPUT_FILE"
-}
-
-audit_file_change "$OUTPUT_FILE" write_world_report || exit 1
-
-echo
-echo "[+] Report saved to:"
-echo "    $OUTPUT_FILE"
 
 echo
 echo "========================================"

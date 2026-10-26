@@ -77,21 +77,6 @@ component_main() {
             command -v sestatus >/dev/null || return 1
             sestatus || return 1
             log 'VERIFIED enforcing runtime; review persistent mode and policy exceptions separately' ;;
-        netfilter)
-            # UFW is this repository's writer. Never flush or add a competing
-            # iptables ruleset that could lock out SSH or break NAT/VPN traffic.
-            backup_system_paths /etc/ufw /etc/iptables /etc/nftables.conf || return 1
-            for file in iptables-save ip6tables-save; do
-                command -v "$file" >/dev/null || continue
-                (umask 077; "$file" > "$SYSTEM_BACKUP_DIR/$file.rules") || return 1
-                found=1
-            done
-            if command -v nft >/dev/null; then
-                (umask 077; nft list ruleset > "$SYSTEM_BACKUP_DIR/nftables.rules") || return 1
-                found=1
-            fi
-            ((found)) || { log 'SKIPPED: no Netfilter inspection utilities installed'; return 0; }
-            log "SAVED IPv4/IPv6 Netfilter rules where available: $SYSTEM_BACKUP_DIR" ;;
         dhclient)
             [[ -f /etc/dhcp/dhclient.conf ]] || { log 'SKIPPED: ISC DHCP client config absent (NetworkManager/networkd may manage DHCP)'; return 0; }
             component_config /etc/dhcp/dhclient.conf || return 1

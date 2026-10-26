@@ -13,8 +13,6 @@ fail() {
 
 command -v python3 >/dev/null 2>&1 || fail 'python3 is required to create the project virtual environment.'
 
-(( EUID != 0 )) || fail 'Run ./setup.sh from the desktop user account, not from a root shell. The Flask server stays unprivileged and requests sudo only for scripts and protected file operations.'
-
 if [[ ! -x "$VENV_PYTHON" ]]; then
     printf 'Creating the project virtual environment at %s\n' "$VENV_DIR"
     python3 -m venv "$VENV_DIR" || fail 'Could not create .venv. Install the Python venv component for your distribution and run ./setup.sh again.'
@@ -24,16 +22,18 @@ fi
 "$VENV_PYTHON" -m pip --version >/dev/null 2>&1 || fail 'pip is unavailable in .venv. Recreate the virtual environment with Python venv support, then run ./setup.sh again.'
 
 printf 'Installing dashboard dependencies from main/requirements.txt\n'
-if ! "$VENV_PYTHON" -m pip install --disable-pip-version-check --no-cache-dir -r "$MAIN_DIR/requirements.txt"; then
+if ! "$VENV_PYTHON" -m pip install --disable-pip-version-check --no-cache-dir --progress-bar off -q -r "$MAIN_DIR/requirements.txt"; then
     fail 'Dependency installation failed. Check the network/package index and run ./setup.sh again. The dashboard was not started.'
 fi
 
 "$VENV_PYTHON" -c 'import flask' >/dev/null 2>&1 || fail 'Flask could not be imported from .venv after installation. The dashboard was not started.'
 
 PRIVILEGE_CMD=''
-if command -v sudo >/dev/null 2>&1 && sudo -v; then
+if (( EUID == 0 )); then
+    PRIVILEGE_CMD=''
+elif command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
     PRIVILEGE_CMD=sudo
-elif command -v doas >/dev/null 2>&1 && doas true; then
+elif command -v doas >/dev/null 2>&1 && doas -n true 2>/dev/null; then
     PRIVILEGE_CMD=doas
 elif command -v pkexec >/dev/null 2>&1; then
     PRIVILEGE_CMD=pkexec
@@ -54,15 +54,43 @@ privilege_available() {
     else return 1; fi
 }
 run_privileged() {
-    if [[ "$PRIVILEGE_CMD" == pkexec ]]; then pkexec "$@"
+    if (( EUID == 0 )); then "$@"
+    elif [[ "$PRIVILEGE_CMD" == pkexec ]]; then pkexec "$@"
     elif [[ -n "$PRIVILEGE_CMD" ]]; then "$PRIVILEGE_CMD" "$@"
     else return 1; fi
+}
+
+configure_passwordless_sudo() {
+    (( EUID == 0 )) || return 0
+    command -v sudo >/dev/null 2>&1 || return 0
+    local target_user="${SUDO_USER:-root}" sudoers_dir=/etc/sudoers.d rule tmp
+    if [[ "$DISTRO" == freebsd ]]; then
+        sudoers_dir=/usr/local/etc/sudoers.d
+        [[ -e /usr/local/etc/sudoers.d ]] || sudoers_dir=/usr/local/etc
+    fi
+    [[ "$target_user" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*[$]?$ ]] || fail 'Cannot safely determine the account for the sudoers rule.'
+    command -v visudo >/dev/null 2>&1 || fail 'visudo is required to safely configure passwordless sudo.'
+    [[ -d "$sudoers_dir" && ! -L "$sudoers_dir" ]] || fail "The sudoers directory is unavailable: $sudoers_dir"
+    if [[ "$DISTRO" == freebsd && "$sudoers_dir" == /usr/local/etc ]]; then
+        rule="$sudoers_dir/90-cyberpatriot-nopasswd"
+    else
+        rule="$sudoers_dir/90-cyberpatriot-nopasswd"
+    fi
+    [[ ! -L "$rule" ]] || fail "Refusing to replace a symbolic link at $rule"
+    tmp=$(mktemp "$sudoers_dir/.cyberpatriot-nopasswd.XXXXXX") || fail 'Could not prepare the sudoers rule.'
+    printf '%s ALL=(ALL:ALL) NOPASSWD: ALL\n' "$target_user" > "$tmp"
+    chmod 0440 "$tmp" || { rm -f "$tmp"; fail 'Could not set safe permissions on the sudoers rule.'; }
+    if ! visudo -cf "$tmp"; then rm -f "$tmp"; fail 'Generated sudoers rule did not validate; existing policy was left unchanged.'; fi
+    mv -f -- "$tmp" "$rule" || { rm -f "$tmp"; fail 'Could not install the sudoers rule.'; }
+    visudo -c || fail 'Sudoers validation failed after installing the CyberPatriot rule.'
+    printf 'Configured passwordless sudo for %s.\n' "$target_user"
 }
 
 DISTRO=''
 if [[ -r "$SCRIPT_DIR/service_helpers/distribution.sh" ]]; then
     DISTRO="$(bash -c 'source "$1"; load_distribution || exit 1; printf "%s" "$CP_DISTRO"' distribution "$SCRIPT_DIR/service_helpers/distribution.sh" 2>/dev/null || true)"
 fi
+configure_passwordless_sudo
 if command -v meld >/dev/null 2>&1; then
     printf 'Meld is already installed: %s\n' "$(command -v meld)"
 elif [[ "$DISTRO" == ubuntu || "$DISTRO" == debian || "$DISTRO" == mint ]]; then
@@ -70,14 +98,14 @@ elif [[ "$DISTRO" == ubuntu || "$DISTRO" == debian || "$DISTRO" == mint ]]; then
         printf 'Meld is unavailable: apt-get was not found. Install Meld manually if this desktop supports it.\n' >&2
     elif ! apt-cache show meld >/dev/null 2>&1; then
         printf 'Meld is unavailable from the configured APT repositories; continuing without it.\n' >&2
-    elif privilege_available; then
+    elif (( EUID == 0 )) || privilege_available; then
         if run_privileged apt-get install -y meld; then printf 'Meld installation completed.\n'; else printf 'Meld installation failed; the dashboard will continue without Meld.\n' >&2; fi
     else
         if [[ "$PRIVILEGE_CMD" == doas ]]; then printf 'Meld is available through APT but could not be installed automatically. Install it with: doas apt-get install meld\n' >&2; elif [[ "$PRIVILEGE_CMD" == pkexec ]]; then printf 'Meld is available through APT but could not be installed automatically. Install it with: pkexec apt-get install meld\n' >&2; else printf 'Meld is available through APT but could not be installed automatically. Install it with: sudo apt-get install meld\n' >&2; fi
     fi
 elif [[ "$DISTRO" == freebsd ]]; then
     if command -v pkg >/dev/null 2>&1 && pkg search -U -q -x '^meld-[0-9]' 2>/dev/null | grep -q .; then
-        if privilege_available; then
+        if (( EUID == 0 )) || privilege_available; then
             if run_privileged pkg install -y meld; then printf 'Meld installation completed through pkg.\n'; else printf 'Meld is listed by pkg but installation failed; continuing without it.\n' >&2; fi
         else
             if [[ "$PRIVILEGE_CMD" == doas ]]; then printf 'A Meld package is listed for this FreeBSD release. Install it with: doas pkg install meld\n' >&2; else printf 'A Meld package is listed for this FreeBSD release. Install it with: sudo pkg install meld\n' >&2; fi
@@ -109,4 +137,11 @@ fi
 
 cd "$SCRIPT_DIR"
 printf 'Starting the dashboard at http://127.0.0.1:%s\n' "$PORT"
+if (( EUID == 0 )); then
+    DASHBOARD_USER="${SUDO_USER:-}"
+    if [[ -n "$DASHBOARD_USER" ]] && id "$DASHBOARD_USER" >/dev/null 2>&1; then
+        exec su -m "$DASHBOARD_USER" -c "exec env CYBERPATRIOT_HOST=127.0.0.1 CYBERPATRIOT_PORT=$PORT $VENV_PYTHON $MAIN_DIR/run_dashboard.py"
+    fi
+    fail 'When setup.sh is run as root, set SUDO_USER to the desktop account so the dashboard can stay unprivileged.'
+fi
 exec env CYBERPATRIOT_HOST=127.0.0.1 "CYBERPATRIOT_PORT=$PORT" "$VENV_PYTHON" "$MAIN_DIR/run_dashboard.py"

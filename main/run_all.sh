@@ -28,10 +28,10 @@ declare -A SCRIPT_MAP=(
 declare -A DESCRIPTION=(
     [sys]='Check system components and protect their configuration'
 
-    [ker]='Kernel settings'
+    [ker]='Kernel hardening'
     [log]='Guest login settings'
     [pol]='Password policy'
-    [usr]='Audit users/admins for second-pass cleanup'
+    [usr]='Audit users/admins against authorized-user lists'
     [mp3]='Inventory media for second-pass removal (no deletion)'
     [pkg]='Remove listed packages'
     [mal]='Scan files with ClamAV'
@@ -130,18 +130,18 @@ if [[ "$CP_DISTRO" == freebsd ]]; then
     pkg upgrade || exit 1
 else
     # Refresh package metadata before upgrading; stop if either command fails.
-    log "RUN sudo apt update"
-    if sudo apt update; then
-        log "PASS sudo apt update"
+    log "RUN apt-get update"
+    if apt-get update -qq; then
+        log "PASS apt-get update"
     else
         status=$?
         log "FAILED sudo apt update (exit $status)"
         exit "$status"
     fi
     backup_package_configuration || exit 1
-    log "RUN sudo apt upgrade"
-    if sudo apt upgrade; then
-        log "PASS sudo apt upgrade"
+    log "RUN apt-get upgrade"
+    if DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq; then
+        log "PASS apt-get upgrade"
     else
         status=$?
         log "FAILED sudo apt upgrade (exit $status)"

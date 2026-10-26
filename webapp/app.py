@@ -30,19 +30,19 @@ COMPARE_LOCKS: dict[str, threading.Lock] = {}
 app = Flask(__name__, template_folder=str(ROOT / "webapp" / "templates"), static_folder=str(ROOT / "webapp" / "static"))
 app.secret_key = os.environ.get("CYBERPATRIOT_FLASK_SECRET", "local-cyberpatriot-dashboard")
 
-# Keep this order aligned with ORDER and SCRIPT_MAP in main/run_all.sh.
+# Dashboard order follows main/run_all.sh: kernel/login/password/users/media/packages/permissions/components/comparisons, then the optional scan.
 TASKS = [
-    {"id": "mal", "name": "ClamAV Scan", "script": "rm_stuff/clamav.sh", "logs": ["log/clamav.txt"]},
-    {"id": "ker", "name": "Kernel", "script": "config/kernel.sh", "configs": ["/etc/sysctl.d/99-hardening.conf", "/etc/sysctl.conf", "/etc/sudoers", "/etc/polkit-1/rules.d/00-cyberpatriot-admins.rules", "/usr/local/etc/sudoers", "/usr/local/etc/polkit-1/rules.d", "/etc/rc.conf", "/etc/fstab"]},
+    {"id": "ker", "name": "Kernel Hardening", "script": "config/kernel.sh", "configs": ["/etc/sysctl.d/99-hardening.conf", "/etc/sysctl.conf", "/etc/sudoers", "/etc/polkit-1/rules.d/00-cyberpatriot-admins.rules", "/usr/local/etc/sudoers", "/usr/local/etc/polkit-1/rules.d", "/etc/rc.conf", "/etc/fstab"]},
     {"id": "log", "name": "Guest Login", "script": "config/login.sh", "configs": ["/etc/lightdm", "/etc/gdm3", "/etc/sddm.conf", "/usr/local/etc/lightdm", "/etc/passwd", "/etc/shadow", "/etc/group", "/etc/gshadow", "/etc/passwd-", "/etc/shadow-", "/etc/group-", "/etc/gshadow-", "/etc/master.passwd", "/etc/pwd.db", "/etc/spwd.db"]},
     {"id": "pol", "name": "Password Policy", "script": "password_management/pwd_policy.sh", "configs": ["/etc/login.defs", "/etc/security/pwquality.conf", "/etc/security/faillock.conf", "/etc/pam.d/common-auth", "/etc/pam.d/common-account", "/etc/pam.d/common-password", "/etc/pam.d/common-session", "/etc/pam.d/common-session-noninteractive", "/usr/share/pam-configs/cyberpatriot-faillock-preauth", "/usr/share/pam-configs/cyberpatriot-faillock-authfail", "/etc/pam.d/passwd", "/etc/login.conf", "/etc/login.conf.db", "/etc/apt", "/var/lib/pam"]},
-    {"id": "usr", "name": "User Audit", "script": "user_management/user_management.sh", "logs": ["log/unauth_users(2).txt", "log/unauth_admins(2).txt"], "edit_lists": [("Edit Authorized Users", "input/auth_users.txt"), ("Edit Authorized Admins", "input/auth_admins.txt")], "second": {"name": "User Cleanup", "script": "user_management/user_management_2.sh", "logs": ["log/user_management(2).txt"], "configs": ["/etc/passwd", "/etc/shadow", "/etc/group", "/etc/gshadow", "/etc/passwd-", "/etc/shadow-", "/etc/group-", "/etc/gshadow-", "/etc/master.passwd", "/etc/pwd.db", "/etc/spwd.db"]}},
+    {"id": "usr", "name": "User Management", "script": "user_management/user_management.sh", "logs": ["log/unauth_users(2).txt", "log/unauth_admins(2).txt"], "edit_lists": [("Edit Authorized Users", "input/auth_users.txt"), ("Edit Authorized Admins", "input/auth_admins.txt")], "second": {"name": "User Cleanup", "script": "user_management/user_management_2.sh", "logs": ["log/user_management(2).txt"]}},
     {"id": "mp3", "name": "Media Inventory", "script": "rm_stuff/rm_mp3+.sh", "logs": ["log/media_files(2).txt"], "second": {"name": "Media Cleanup", "script": "rm_stuff/rm_mp3+_2.sh", "logs": ["log/media_cleanup(2).txt"]}},
     {"id": "pkg", "name": "Bad Packages", "script": "rm_stuff/bad_pkg.sh", "edit_packages": True, "configs": ["/etc", "/usr/local/etc"]},
-    {"id": "per", "name": "File Permissions", "script": "config/file_permissions.sh", "configs": ["/etc", "/usr/local/etc", "/usr/lib/systemd/system", "/usr/share/ca-certificates", "/usr/share/certs", "/etc/pki", "/usr/local/share/ca-certificates", "/usr/local/share/certs", "/lib/security", "/lib64/security", "/usr/lib/security", "/usr/lib64/security", "/boot/grub/grub.cfg", "/boot/grub2/grub.cfg", "/boot/efi/EFI/ubuntu/grub.cfg", "/boot/efi/EFI/centos/grub.cfg", "/boot/efi/EFI/redhat/grub.cfg", "/boot/loader/entries", "/etc/rc.d", "/usr/local/etc/rc.d", "/etc/rc.conf.d", "/usr/local/etc/rc.conf.d"], "logs": ["log/world_files.txt", "log/world_files.txt.errors"]},
-    {"id": "sys", "name": "System Components", "script": "config/system_hardening.sh", "configs": ["/etc/nsswitch.conf", "/etc/ssl/openssl.cnf", "/etc/ssl/private", "/etc/ssl/certs", "/etc/ssl/untrusted", "/etc/default/grub", "/boot/grub/grub.cfg", "/boot/grub2/grub.cfg", "/boot/loader.conf", "/boot/loader.conf.local", "/boot/loader.rc", "/boot/loader.conf.d", "/boot/loader/entries", "/etc/selinux/config", "/etc/ufw", "/etc/iptables", "/etc/nftables.conf", "/etc/dhcp/dhclient.conf", "/etc/dhcp/dhclient-enter-hooks.d", "/etc/dhcp/dhclient-exit-hooks.d", "/etc/sysctl.conf", "/etc/rc.conf", "/etc/rc.conf.local", "/etc/fstab", "/etc/hosts", "/usr/lib/systemd/system", "/usr/share/ca-certificates", "/usr/share/certs", "/etc/pki", "/usr/local/share/ca-certificates", "/usr/local/share/certs", "/usr/local/etc/ssl/certs", "/etc/rc.d", "/usr/local/etc/rc.d", "/etc/rc.conf.d", "/usr/local/etc/rc.conf.d"]},
-    {"id": "cpkg", "name": "Package Comparison", "script": "compare/compare_pkgs.sh", "logs": ["compare/compare_pkgs.txt"]},
-    {"id": "csvc", "name": "Service Comparison", "script": "compare/compare_services.sh", "logs": ["compare/compare_services.txt"]},
+    {"id": "per", "name": "File Permissions", "script": "config/file_permissions.sh", "configs": ["/etc", "/usr/local/etc", "/usr/lib/systemd/system", "/usr/share/ca-certificates", "/usr/share/certs", "/etc/pki", "/usr/local/share/ca-certificates", "/usr/local/share/certs", "/lib/security", "/lib64/security", "/usr/lib/security", "/usr/lib64/security", "/boot/grub/grub.cfg", "/boot/grub2/grub.cfg", "/boot/efi/EFI/ubuntu/grub.cfg", "/boot/efi/EFI/centos/grub.cfg", "/boot/efi/EFI/redhat/grub.cfg", "/boot/loader/entries", "/etc/rc.d", "/usr/local/etc/rc.d", "/etc/rc.conf.d", "/usr/local/etc/rc.conf.d"]},
+    {"id": "sys", "name": "System Components", "script": "config/system_hardening.sh", "configs": ["/etc/nsswitch.conf", "/etc/ssl/openssl.cnf", "/etc/ssl/private", "/etc/ssl/certs", "/etc/ssl/untrusted", "/etc/default/grub", "/boot/grub/grub.cfg", "/boot/grub2/grub.cfg", "/boot/loader.conf", "/boot/loader.conf.local", "/boot/loader.rc", "/boot/loader.conf.d", "/boot/loader/entries", "/etc/selinux/config", "/etc/dhcp/dhclient.conf", "/etc/dhcp/dhclient-enter-hooks.d", "/etc/dhcp/dhclient-exit-hooks.d", "/etc/sysctl.conf", "/etc/rc.conf", "/etc/rc.conf.local", "/etc/fstab", "/etc/hosts", "/usr/lib/systemd/system", "/usr/share/ca-certificates", "/usr/share/certs", "/etc/pki", "/usr/local/share/ca-certificates", "/usr/local/share/certs", "/usr/local/etc/ssl/certs", "/etc/rc.d", "/usr/local/etc/rc.d", "/etc/rc.conf.d", "/usr/local/etc/rc.conf.d"]},
+    {"id": "cpkg", "name": "Package Comparison", "script": "compare/compare_pkgs.sh", "logs": ["log/pkgs_log.txt"]},
+    {"id": "csvc", "name": "Service Comparison", "script": "compare/compare_services.sh", "logs": ["log/services_log.txt"]},
+    {"id": "mal", "name": "ClamAV Scan", "script": "rm_stuff/clamav.sh", "logs": ["log/clamav.txt"]},
 ]
 
 INPUT_FILES = [
@@ -57,12 +57,22 @@ INPUT_EDITOR_DETAILS = {
     "compare/pkgs/safe_pkgs.txt": ("Trusted Package Reference", "Add one package name per line. Keep distribution-specific names; comparison results do not determine whether a package is safe."),
     "compare/services/safe_services.txt": ("Trusted Service Reference", "Add one service name and expected boot state per line, such as ssh.service enabled. Allowed states are enabled and disabled."),
 }
+
 UPDATE_ACTION = {
     "id": "updates",
     "name": "Updates and APT Reset",
     "description": "Runs the initial startup repair and package refresh/upgrade steps used by main/run_all.sh.",
     "configs": ["/etc/environment", "/etc/apt"],
 }
+
+@app.post("/distribution")
+def set_distribution():
+    selection = request.form.get("distribution", "")
+    if selection not in {"auto", "ubuntu", "debian", "mint", "freebsd"}:
+        abort(400)
+    path = ROOT / "input" / "distribution.txt"
+    path.write_text("# Choose auto to detect, or choose the matching installed distribution.\n" + selection + "\n", encoding="utf-8")
+    return redirect(url_for("dashboard"))
 
 
 def _load_state() -> dict[str, Any]:
@@ -413,7 +423,13 @@ def dashboard():
     update_status = _status("__updates__")
     update_files = _files_for_updates()
     aggregate = [name for name in ("main/all_logs.txt", "main/all_logs(2).txt") if _is_regular_view_file(name)]
-    return render_template("dashboard.html", tasks=_all_tasks(), inputs=INPUT_FILES, update=UPDATE_ACTION, update_status=update_status, update_files=update_files, aggregate=aggregate, update_review=url_for("review_run", backup_id=update_status["backup_id"]) if update_status.get("backup_id") else None)
+    distribution_file = ROOT / "input" / "distribution.txt"
+    selected_distribution = "auto"
+    try:
+        selected_distribution = next((line.strip() for line in distribution_file.read_text(encoding="utf-8").splitlines() if line.strip() and not line.lstrip().startswith("#")), "auto")
+    except OSError:
+        pass
+    return render_template("dashboard.html", tasks=_all_tasks(), inputs=INPUT_FILES, update=UPDATE_ACTION, update_status=update_status, update_files=update_files, aggregate=aggregate, selected_distribution=selected_distribution, update_review=url_for("review_run", backup_id=update_status["backup_id"]) if update_status.get("backup_id") else None)
 
 
 @app.post("/run/<path:script>")

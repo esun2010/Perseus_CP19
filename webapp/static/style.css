@@ -62,6 +62,15 @@ h1 { margin: 0 0 4px; font-size: clamp(1.45rem, 3vw, 2rem); }
 .file-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .file-button { min-height: 34px; padding: 6px 10px; font-size: .83rem; overflow-wrap: anywhere; }
 .input-list { display: grid; gap: 4px; }
+.script-order-list { margin: 0 0 14px; padding-left: 1.6rem; columns: 2; }
+.script-order-list li { break-inside: avoid; padding: 2px 0; }
+.script-panel[hidden] { display: none; }
+.script-title-row { display: flex; align-items: center; gap: 12px; }
+.script-title-row .section-heading { flex: 1; margin-bottom: 8px; }
+.script-visibility-toggle { min-height: 32px; padding: 5px 10px; font-size: .82rem; }
+.script-content[hidden] { display: none; }
+.distribution-choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.distribution-choices form { margin: 0; }
 .input-row { border-top: 1px solid rgba(255,255,255,.25); padding: 8px 0; }
 .input-row:first-child { border-top: 0; }
 .input-row span { overflow-wrap: anywhere; }
@@ -85,6 +94,8 @@ textarea:focus { border-color: white; box-shadow: 0 0 0 2px rgba(255,255,255,.13
   .section-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
   .section-heading p, .script-path { text-align: left; }
   .script-row { align-items: flex-start; }
+  .script-order-list { columns: 1; }
+  .script-title-row { align-items: flex-start; flex-wrap: wrap; }
   .run-controls { gap: 6px; }
   .status-message { min-width: 90px; font-size: .84rem; }
 }

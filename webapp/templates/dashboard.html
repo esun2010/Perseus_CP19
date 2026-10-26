@@ -8,6 +8,10 @@
 
   <section class="panel"><div class="section-heading"><div><h2>Meld and Configuration Backups</h2></div><a class="button secondary" href="{{ url_for('meld_dashboard') }}">Open Meld and Backups</a></div><p>Compare files or directories, create backups, review script changes, or restore a saved configuration.</p></section>
 
+  <section class="panel" aria-labelledby="script-order-title"><div class="section-heading"><div><h2 id="script-order-title">Script order</h2></div><p>Displayed in the same order as the dashboard sections below.</p></div>
+    <ol class="script-order-list"><li>Updates and APT Reset</li><li>Input Files</li>{% for task in tasks %}<li>{{ task.name }}{% if task.second %} (then {{ task.second.name }}){% endif %}</li>{% endfor %}</ol>
+  </section>
+
   <section class="panel update-panel" aria-labelledby="updates-title">
     <div class="section-heading">
       <div><span class="section-number">1</span><h2 id="updates-title">Updates and APT Reset</h2></div>
@@ -18,10 +22,17 @@
       <div class="run-controls"><span class="status-message" data-status-message>{{ update_status.message or update_status.status }}</span><button class="run-button {{ update_status.status|lower }}" data-run-url="{{ url_for('run_script', script='updates') }}">Run</button></div>
     </div>
     <div class="file-actions" data-files-container>
-      {% for file in update_files.logs %}<a class="button file-button" href="{{ url_for('view_file', path=file) }}" target="_blank" rel="noopener">Log: {{ file }}</a>{% endfor %}
-      {% for file in update_files.configs %}<a class="button file-button" href="{{ url_for('view_file', path=file) }}" target="_blank" rel="noopener">Config: {{ file }}</a>{% endfor %}
+      {% for file in update_files.logs %}<a class="button file-button" href="{{ url_for('view_file', path=file) }}">Log: {{ file }}</a>{% endfor %}
+      {% for file in update_files.configs %}<a class="button file-button" href="{{ url_for('view_file', path=file) }}">Config: {{ file }}</a>{% endfor %}
     </div>
     <div class="file-actions" data-review-container>{% if update_review %}<a class="button secondary" href="{{ update_review }}">Review Script Changes</a>{% endif %}</div>
+  </section>
+
+  <section class="panel distribution-panel" aria-labelledby="distribution-title">
+    <div class="section-heading"><div><span class="section-number">2</span><h2 id="distribution-title">Distribution</h2></div><p>Choose auto or the distribution installed on this machine.</p></div>
+    <div class="distribution-choices" role="group" aria-label="Choose distribution">
+      {% for distro in ['auto', 'ubuntu', 'debian', 'mint', 'freebsd'] %}<form method="post" action="{{ url_for('set_distribution') }}"><input type="hidden" name="distribution" value="{{ distro }}"><button class="button {% if selected_distribution == distro %}primary{% else %}secondary{% endif %}" type="submit" {% if selected_distribution == distro %}aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>{{ distro|title }}</button></form>{% endfor %}
+    </div>
   </section>
 
   <section class="panel" aria-labelledby="inputs-title">
@@ -35,7 +46,8 @@
 
   {% for task in tasks %}
   <section class="panel script-panel" aria-labelledby="task-{{ task.id }}">
-    <div class="section-heading"><div><span class="section-number">{{ loop.index + 2 }}</span><h2 id="task-{{ task.id }}">{{ task.name }}</h2></div><span class="script-path">{{ task.script }}</span></div>
+    <div class="script-title-row"><div class="section-heading"><div><span class="section-number">{{ loop.index + 3 }}</span><h2 id="task-{{ task.id }}">{{ task.name }}</h2></div><span class="script-path">{{ task.script }}</span></div><button type="button" class="button secondary script-visibility-toggle" data-script-visibility="{{ task.id }}" aria-expanded="true">Hide scripts</button></div>
+    <div class="script-content" data-script-content="{{ task.id }}">
     {% set scripts = [(task.name, task.script, task.status, task.files)] %}
     {% if task.second %}{% set scripts = scripts + [(task.second.name, task.second.script, task.second.status, task.second_files)] %}{% endif %}
     {% for script_name, script_path, script_status, script_files in scripts %}
@@ -47,19 +59,20 @@
       <div class="file-actions" data-files-container>
         {% if task.edit_packages and loop.first %}<a class="button secondary" href="{{ url_for('edit_packages') }}">Edit List</a>{% endif %}
         {% if task.edit_lists and loop.first %}{% for label, file in task.edit_lists %}<a class="button secondary" href="{{ url_for('edit_input', relpath=file) }}">{{ label }}</a>{% endfor %}{% endif %}
-        {% for file in script_files.logs %}<a class="button file-button" href="{{ url_for('view_file', path=file) }}" target="_blank" rel="noopener">Log: {{ file }}</a>{% endfor %}
-        {% for file in script_files.configs %}<a class="button file-button" href="{{ url_for('view_file', path=file) }}" target="_blank" rel="noopener">Config: {{ file }}</a>{% endfor %}
+        {% for file in script_files.logs %}<a class="button file-button" href="{{ url_for('view_file', path=file) }}">Log: {{ file }}</a>{% endfor %}
+        {% for file in script_files.configs %}<a class="button file-button" href="{{ url_for('view_file', path=file) }}">Config: {{ file }}</a>{% endfor %}
       </div>
       <div class="file-actions" data-review-container>{% if script_status and script_status.backup_id %}<a class="button secondary" href="{{ url_for('review_run', backup_id=script_status.backup_id) }}">Review Script Changes</a>{% endif %}</div>
     </div>
     {% endfor %}
+    </div>
   </section>
   {% endfor %}
 
   {% for file in aggregate %}
   <section class="panel aggregate-panel">
-    <div class="section-heading"><div><span class="section-number">{{ tasks|length + loop.index + 2 }}</span><h2>{% if file.endswith('all_logs.txt') %}Aggregate Log{% else %}Second-pass Aggregate Log{% endif %}</h2></div><span class="script-path">{{ file }}</span></div>
-    <div class="file-actions"><a class="button file-button" href="{{ url_for('view_file', path=file) }}" target="_blank" rel="noopener">View {{ file }}</a></div>
+    <div class="section-heading"><div><span class="section-number">{{ tasks|length + loop.index + 3 }}</span><h2>{% if file.endswith('all_logs.txt') %}Aggregate Log{% else %}Second-pass Aggregate Log{% endif %}</h2></div><span class="script-path">{{ file }}</span></div>
+    <div class="file-actions"><a class="button file-button" href="{{ url_for('view_file', path=file) }}">View {{ file }}</a></div>
   </section>
   {% endfor %}
 {% endblock %}

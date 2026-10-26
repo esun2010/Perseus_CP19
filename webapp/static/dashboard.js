@@ -9,8 +9,6 @@
     const add = (kind, path) => {
       const link = document.createElement("a");
       link.className = "button file-button";
-      link.target = "_blank";
-      link.rel = "noopener";
       link.textContent = `${kind}: ${path}`;
       link.href = "/view?path=" + encodeURIComponent(path);
       container.appendChild(link);
@@ -85,6 +83,26 @@
       refreshRow(row);
     });
     refreshRow(row);
+  });
+
+  document.querySelectorAll("[data-script-visibility]").forEach((button) => {
+    const id = button.dataset.scriptVisibility;
+    const content = document.querySelector(`[data-script-content="${CSS.escape(id)}"]`);
+    if (!content) return;
+    const key = `cyberpatriot-hidden-script-${id}`;
+    const applyVisibility = (hidden) => {
+      content.hidden = hidden;
+      button.textContent = hidden ? "Show scripts" : "Hide scripts";
+      button.setAttribute("aria-expanded", String(!hidden));
+    };
+    let hidden = false;
+    try { hidden = localStorage.getItem(key) === "true"; } catch (_) { /* Keep default visible if storage is unavailable. */ }
+    applyVisibility(hidden);
+    button.addEventListener("click", () => {
+      hidden = !hidden;
+      try { localStorage.setItem(key, String(hidden)); } catch (_) { /* Current-page toggle still works. */ }
+      applyVisibility(hidden);
+    });
   });
 
   window.setInterval(() => {

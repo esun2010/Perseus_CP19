@@ -56,20 +56,6 @@ component_main() {
             log 'Boot settings/passwords require scenario review; no bootloader regenerated or installed' ;;
         selinux)
             log 'NOT APPLICABLE: FreeBSD does not implement Linux SELinux. Native MAC policies require scenario-specific configuration; no security framework replaced' ;;
-        netfilter)
-            backup_system_paths /etc/pf.conf /etc/ipfw.rules /etc/rc.firewall /etc/rc.conf /etc/rc.conf.local || return 1
-            # Query only already loaded firewall modules; never enable or flush.
-            if [[ -c /dev/pf ]]; then
-                (umask 077; pfctl -si > "$SYSTEM_BACKUP_DIR/pf-status.txt" && pfctl -a '*' -sr > "$SYSTEM_BACKUP_DIR/pf-filter.rules" && pfctl -a '*' -sn > "$SYSTEM_BACKUP_DIR/pf-nat.rules") || return 1
-                found=1
-            fi
-            if sysctl -n net.inet.ip.fw.enable >/dev/null 2>&1; then
-                (umask 077; ipfw -a list > "$SYSTEM_BACKUP_DIR/ipfw.rules") || return 1
-                found=1
-            fi
-            if ((found)); then log "SAVED native firewall inspection: $SYSTEM_BACKUP_DIR; rules unchanged"
-            else log 'SKIPPED runtime firewall snapshot: neither PF nor IPFW is loaded'; fi
-            log 'Netfilter/iptables are Linux-only' ;;
         dhclient)
             for file in /etc/dhclient.conf /usr/local/etc/dhclient.conf; do
                 [[ -e "$file" || -L "$file" ]] || continue

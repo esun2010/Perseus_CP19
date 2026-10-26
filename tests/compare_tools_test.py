@@ -100,7 +100,7 @@ esac
         self.assertEqual(inventory.read_text(), "alpha\nextra\n")
         self.assertEqual(
             (self.root / "compare/compare_pkgs.txt").read_text(),
-            "[extra] extra\n[missing] missing\n",
+            "[extra] extra\n",
         )
 
     def test_empty_package_lists_and_invalid_inputs(self):
@@ -175,7 +175,7 @@ esac
         self.assertEqual(
             (self.root / "compare/compare_services.txt").read_text(),
             "[disabled] bar.service\n[disabled] masked.service\n[enabled] foo.service\n"
-            "[extra] extra.service\n[missing] missing.service\n",
+            "[extra] extra.service\n",
         )
 
     def test_service_malformed_reference_and_collection_failure(self):
@@ -220,7 +220,7 @@ esac
         self.assertEqual(inventory.read_text(), "cron disabled\nextra disabled\nsshd enabled\n")
         self.assertEqual(
             (self.root / "compare/compare_services.txt").read_text(),
-            "[disabled] cron\n[enabled] sshd\n[extra] extra\n[missing] missing\n",
+            "[disabled] cron\n[enabled] sshd\n[extra] extra\n",
         )
 
 

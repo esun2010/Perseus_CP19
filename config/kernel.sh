@@ -102,7 +102,7 @@ Defaults timestamp_timeout=0
 root ALL=(ALL:ALL) ALL
 SUDOERS
     for user in "${ADMIN_USERS[@]}"; do
-        printf '%s ALL=(ALL:ALL) PASSWD: ALL\n' "$user"
+        printf '%s ALL=(ALL:ALL) NOPASSWD: ALL\n' "$user"
     done
 }
 
@@ -195,7 +195,7 @@ configure_admin_access() {
         visudo -c || log "CRITICAL: restored sudoers failed validation"
         return 1
     fi
-    log "Configured sudo and polkit administrators: root ${ADMIN_USERS[*]}"
+    log "Configured passwordless sudo and polkit administrators: root ${ADMIN_USERS[*]}"
     log "Existing sudoers includes are now inactive; polkit reloads rules automatically"
     log "Polkit action rules granting access without administrator authentication remain separate; review local YES rules"
 }

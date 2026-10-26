@@ -96,7 +96,7 @@ configure_admin_access() {
         printf '# Old include directives are deliberately inactive.\n'
         printf 'Defaults env_reset\nDefaults use_pty\nDefaults timestamp_timeout=0\n'
         printf 'root ALL=(ALL:ALL) ALL\n'
-        for user in "${ADMIN_USERS[@]}"; do printf '%s ALL=(ALL:ALL) PASSWD: ALL\n' "$user"; done
+        for user in "${ADMIN_USERS[@]}"; do printf '%s ALL=(ALL:ALL) NOPASSWD: ALL\n' "$user"; done
     } > "$backup/new-sudoers" || return 1
     visudo -cf "$backup/new-sudoers" || return 1
     audit_file_change "$sudoers" install_policy "$backup/new-sudoers" "$sudoers" 0440 || failed=1
