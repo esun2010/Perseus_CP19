@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+SKIP_SYSTEM_SETUP=0
+while getopts ':a' option; do
+    case "$option" in
+        a) SKIP_SYSTEM_SETUP=1 ;;
+        *) printf 'Usage: %s [-a]\n  -a  Skip system package refresh and Python prerequisite installation.\n' "$0" >&2; exit 2 ;;
+    esac
+done
+shift $((OPTIND - 1))
+(( $# == 0 )) || { printf 'Usage: %s [-a]\n' "$0" >&2; exit 2; }
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 MAIN_DIR="$SCRIPT_DIR/main"
 VENV_DIR="$SCRIPT_DIR/.venv"
@@ -10,6 +20,46 @@ fail() {
     printf 'Dashboard setup error: %s\n' "$*" >&2
     exit 1
 }
+
+DISTRO=''
+if [[ -r "$SCRIPT_DIR/service_helpers/distribution.sh" ]]; then
+    DISTRO="$(bash -c 'source "$1"; load_distribution || exit 1; printf "%s" "$CP_DISTRO"' distribution "$SCRIPT_DIR/service_helpers/distribution.sh" 2>/dev/null)" || fail 'Could not detect a supported distribution from input/distribution.txt.'
+fi
+
+PRIVILEGE_CMD=''
+if (( EUID == 0 )); then
+    PRIVILEGE_CMD=''
+elif command -v sudo >/dev/null 2>&1; then
+    PRIVILEGE_CMD=sudo
+elif command -v doas >/dev/null 2>&1; then
+    PRIVILEGE_CMD=doas
+fi
+run_system() {
+    if (( EUID == 0 )); then "$@"
+    elif [[ -n "$PRIVILEGE_CMD" ]]; then "$PRIVILEGE_CMD" "$@"
+    else fail 'System package setup requires root, sudo, or doas.'; fi
+}
+
+if (( ! SKIP_SYSTEM_SETUP )); then
+    case "$DISTRO" in
+        ubuntu|debian|mint)
+            command -v apt-get >/dev/null 2>&1 || fail 'apt-get is required for this distribution.'
+            printf 'Refreshing APT package metadata.\n'
+            run_system apt-get update || fail 'APT metadata refresh failed.'
+            printf 'Installing Python prerequisites.\n'
+            run_system env DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-venv python3-pip || fail 'Python prerequisite installation failed.'
+            ;;
+        freebsd)
+            command -v pkg >/dev/null 2>&1 || fail 'pkg is required for FreeBSD setup.'
+            run_system pkg -N >/dev/null 2>&1 || run_system pkg bootstrap -y || fail 'Could not initialize pkg.'
+            run_system pkg update || fail 'pkg metadata refresh failed.'
+            run_system pkg install -y python3 py311-pip || fail 'Python prerequisite installation failed.'
+            ;;
+        *) fail 'Could not identify a supported distribution.' ;;
+    esac
+else
+    printf 'Skipping system package refresh and Python prerequisite installation (-a).\n'
+fi
 
 command -v python3 >/dev/null 2>&1 || fail 'python3 is required to create the project virtual environment.'
 
@@ -86,10 +136,6 @@ configure_passwordless_sudo() {
     printf 'Configured passwordless sudo for %s.\n' "$target_user"
 }
 
-DISTRO=''
-if [[ -r "$SCRIPT_DIR/service_helpers/distribution.sh" ]]; then
-    DISTRO="$(bash -c 'source "$1"; load_distribution || exit 1; printf "%s" "$CP_DISTRO"' distribution "$SCRIPT_DIR/service_helpers/distribution.sh" 2>/dev/null || true)"
-fi
 configure_passwordless_sudo
 if command -v meld >/dev/null 2>&1; then
     printf 'Meld is already installed: %s\n' "$(command -v meld)"

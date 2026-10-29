@@ -100,17 +100,21 @@ has_admin_access() {
 }
 
 account_review() {
-    local users="$SECOND_ROOT/log/unauth_users(2).txt" admins="$SECOND_ROOT/log/unauth_admins(2).txt"
+    local users="$SECOND_ROOT/log/unauth_users(2).txt" admins="$SECOND_ROOT/log/unauth_admins(2).txt" uid_zero="$SECOND_ROOT/log/uid_zero_users.txt"
     local name uid gid shell status tmp_users tmp_admins
-    prepare_review_logs "$users" "$admins" || return 1
+    prepare_review_logs "$users" "$admins" "$uid_zero" || return 1
     load_authorized_accounts || return 1
     tmp_users=$(mktemp "$users.XXXXXX") || return 1
     tmp_admins=$(mktemp "$admins.XXXXXX") || return 1
+    local tmp_uid_zero
+    tmp_uid_zero=$(mktemp "$uid_zero.XXXXXX") || return 1
     printf '# Second-pass user deletion candidates: username<TAB>UID. Remove or comment out lines to retain accounts.\n' > "$tmp_users"
     printf '# Second-pass administrator revocation candidates: username<TAB>UID. Remove or comment out lines to retain administrator access.\n' > "$tmp_admins"
+    printf '# Accounts with UID 0. Review each entry; root is expected.\n' > "$tmp_uid_zero"
     while IFS=: read -r name _ uid gid _ _ shell; do
         [[ -n "$name" && "$name" != root ]] || continue
         [[ "$uid" =~ ^[0-9]+$ ]] || return 1
+        if ((uid == 0)); then printf '%s\t%s\n' "$name" "$uid" >> "$tmp_uid_zero"; fi
         if [[ -z "${AUTH_USERS[$name]:-}" ]] && { ((uid == 0)) || { ((uid != 65534)) && [[ "$shell" != */nologin && "$shell" != */false && "$shell" != */sync && "$shell" != */halt && "$shell" != */shutdown ]]; }; }; then
             printf '%s\t%s\n' "$name" "$uid" >> "$tmp_users"
         elif [[ -z "${AUTH_ADMINS[$name]:-}" ]]; then
@@ -119,8 +123,8 @@ account_review() {
             ((status)) || printf '%s\t%s\n' "$name" "$uid" >> "$tmp_admins"
         fi
     done <<< "$ACCOUNT_RECORDS"
-    chmod 644 "$tmp_users" "$tmp_admins" || return 1
-    mv "$tmp_users" "$users" && mv "$tmp_admins" "$admins" || return 1
+    chmod 644 "$tmp_users" "$tmp_admins" "$tmp_uid_zero" || return 1
+    mv "$tmp_users" "$users" && mv "$tmp_admins" "$admins" && mv "$tmp_uid_zero" "$uid_zero" || return 1
     log "AUDIT ONLY: review $users and $admins, then run main/run_all_2.sh; no accounts changed"
 }
 

@@ -129,15 +129,6 @@ if [[ "$CP_DISTRO" == freebsd ]]; then
     log 'RUN pkg upgrade'
     pkg upgrade || exit 1
 else
-    # Refresh package metadata before upgrading; stop if either command fails.
-    log "RUN apt-get update"
-    if apt-get update -qq; then
-        log "PASS apt-get update"
-    else
-        status=$?
-        log "FAILED sudo apt update (exit $status)"
-        exit "$status"
-    fi
     backup_package_configuration || exit 1
     log "RUN apt-get upgrade"
     if DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq; then

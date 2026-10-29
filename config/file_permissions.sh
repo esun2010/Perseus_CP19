@@ -40,7 +40,7 @@ echo "[+] Configuring important file permissions..."
 declare -A FILE_PERMS=(
     ["/etc/sudoers"]="440"
     ["/etc/ssh/sshd_config"]="600"
-    ["/etc/crontab"]="644"
+    ["/etc/crontab"]="600"
     ["/etc/fstab"]="644"
     ["/etc/hosts"]="644"
     ["/etc/hostname"]="644"
@@ -50,6 +50,12 @@ for FILE in "${!FILE_PERMS[@]}"; do
     if [ -e "$FILE" ]; then
         audit_chmod "${FILE_PERMS[$FILE]}" "$FILE" || exit 1
     fi
+done
+
+# Sudo include files need a glob because each regular file shares one policy.
+for FILE in /etc/sudoers.d/*; do
+    [ -f "$FILE" ] && [ ! -L "$FILE" ] || continue
+    audit_chmod 440 "$FILE" || exit 1
 done
 
 echo
@@ -63,10 +69,16 @@ declare -A DIR_PERMS=(
     ["/var/log"]="755"
     ["/tmp"]="1777"
     ["/var/tmp"]="1777"
+    ["/etc/cron.d"]="700"
+    ["/etc/cron.daily"]="700"
+    ["/etc/cron.hourly"]="700"
+    ["/etc/cron.weekly"]="700"
+    ["/etc/cron.monthly"]="700"
 )
 
 for DIR in "${!DIR_PERMS[@]}"; do
     if [ -d "$DIR" ]; then
+        case "$DIR" in /etc/cron.d|/etc/cron.daily|/etc/cron.hourly|/etc/cron.weekly|/etc/cron.monthly) chown root:root "$DIR" || exit 1 ;; esac
         audit_chmod "${DIR_PERMS[$DIR]}" "$DIR" || exit 1
     fi
 done
