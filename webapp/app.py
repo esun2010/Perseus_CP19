@@ -30,20 +30,26 @@ COMPARE_LOCKS: dict[str, threading.Lock] = {}
 app = Flask(__name__, template_folder=str(ROOT / "webapp" / "templates"), static_folder=str(ROOT / "webapp" / "static"))
 app.secret_key = os.environ.get("CYBERPATRIOT_FLASK_SECRET", "local-cyberpatriot-dashboard")
 
-# Dashboard order follows main/run_all.sh: kernel/login/password/users/media/packages/permissions/components/comparisons, then the optional scan.
+# Dashboard order follows the requested task flow.
 TASKS = [
-    {"id": "ker", "name": "Kernel Hardening", "script": "config/kernel.sh", "configs": ["/etc/sysctl.d/99-hardening.conf", "/etc/sysctl.conf", "/etc/sudoers", "/etc/polkit-1/rules.d/00-cyberpatriot-admins.rules", "/usr/local/etc/sudoers", "/usr/local/etc/polkit-1/rules.d", "/etc/rc.conf", "/etc/fstab"]},
-    {"id": "log", "name": "Guest Login", "script": "config/login.sh", "configs": ["/etc/lightdm", "/etc/gdm3", "/etc/sddm.conf", "/usr/local/etc/lightdm", "/etc/passwd", "/etc/shadow", "/etc/group", "/etc/gshadow", "/etc/passwd-", "/etc/shadow-", "/etc/group-", "/etc/gshadow-", "/etc/master.passwd", "/etc/pwd.db", "/etc/spwd.db"]},
-    {"id": "pol", "name": "Password Policy", "script": "password_management/pwd_policy.sh", "configs": ["/etc/login.defs", "/etc/security/pwquality.conf", "/etc/security/faillock.conf", "/etc/pam.d/common-auth", "/etc/pam.d/common-account", "/etc/pam.d/common-password", "/etc/pam.d/common-session", "/etc/pam.d/common-session-noninteractive", "/usr/share/pam-configs/cyberpatriot-faillock-preauth", "/usr/share/pam-configs/cyberpatriot-faillock-authfail", "/etc/pam.d/passwd", "/etc/login.conf", "/etc/login.conf.db", "/etc/apt", "/var/lib/pam"]},
     {"id": "usr", "name": "User Management", "script": "user_management/user_management.sh", "logs": ["log/unauth_users(2).txt", "log/unauth_admins(2).txt", "log/uid_zero_users.txt"], "edit_lists": [("Edit Authorized Users", "input/auth_users.txt"), ("Edit Authorized Admins", "input/auth_admins.txt")], "second": {"name": "User Cleanup", "script": "user_management/user_management_2.sh", "logs": ["log/user_management(2).txt"]}},
     {"id": "mp3", "name": "Media Inventory", "script": "rm_stuff/rm_mp3+.sh", "logs": ["log/media_files(2).txt"], "second": {"name": "Media Cleanup", "script": "rm_stuff/rm_mp3+_2.sh", "logs": ["log/media_cleanup(2).txt"]}},
-    {"id": "pkg", "name": "Bad Packages", "script": "rm_stuff/bad_pkg.sh", "edit_packages": True, "configs": ["/etc", "/usr/local/etc"]},
-    {"id": "per", "name": "File Permissions", "script": "config/file_permissions.sh", "configs": ["/etc", "/usr/local/etc", "/usr/lib/systemd/system", "/usr/share/ca-certificates", "/usr/share/certs", "/etc/pki", "/usr/local/share/ca-certificates", "/usr/local/share/certs", "/lib/security", "/lib64/security", "/usr/lib/security", "/usr/lib64/security", "/boot/grub/grub.cfg", "/boot/grub2/grub.cfg", "/boot/efi/EFI/ubuntu/grub.cfg", "/boot/efi/EFI/centos/grub.cfg", "/boot/efi/EFI/redhat/grub.cfg", "/boot/loader/entries", "/etc/rc.d", "/usr/local/etc/rc.d", "/etc/rc.conf.d", "/usr/local/etc/rc.conf.d"]},
+    {"id": "ker", "name": "Kernel Hardening", "script": "config/kernel.sh", "configs": ["/etc/sysctl.d/99-hardening.conf", "/etc/sysctl.conf", "/etc/sudoers", "/etc/polkit-1/rules.d/00-cyberpatriot-admins.rules", "/usr/local/etc/sudoers", "/usr/local/etc/polkit-1/rules.d", "/etc/rc.conf", "/etc/fstab"]},
     {"id": "sys", "name": "System Components", "script": "config/system_hardening.sh", "configs": ["/etc/nsswitch.conf", "/etc/ssl/openssl.cnf", "/etc/ssl/private", "/etc/ssl/certs", "/etc/ssl/untrusted", "/etc/default/grub", "/boot/grub/grub.cfg", "/boot/grub2/grub.cfg", "/boot/loader.conf", "/boot/loader.conf.local", "/boot/loader.rc", "/boot/loader.conf.d", "/boot/loader/entries", "/etc/selinux/config", "/etc/dhcp/dhclient.conf", "/etc/dhcp/dhclient-enter-hooks.d", "/etc/dhcp/dhclient-exit-hooks.d", "/etc/sysctl.conf", "/etc/rc.conf", "/etc/rc.conf.local", "/etc/fstab", "/etc/hosts", "/usr/lib/systemd/system", "/usr/share/ca-certificates", "/usr/share/certs", "/etc/pki", "/usr/local/share/ca-certificates", "/usr/local/share/certs", "/usr/local/etc/ssl/certs", "/etc/rc.d", "/usr/local/etc/rc.d", "/etc/rc.conf.d", "/usr/local/etc/rc.conf.d"]},
+    {"id": "pol", "name": "Password Policy", "script": "password_management/pwd_policy.sh", "configs": ["/etc/login.defs", "/etc/security/pwquality.conf", "/etc/security/faillock.conf", "/etc/pam.d/common-auth", "/etc/pam.d/common-account", "/etc/pam.d/common-password", "/etc/pam.d/common-session", "/etc/pam.d/common-session-noninteractive", "/usr/share/pam-configs/cyberpatriot-faillock-preauth", "/usr/share/pam-configs/cyberpatriot-faillock-authfail", "/etc/pam.d/passwd", "/etc/login.conf", "/etc/login.conf.db", "/etc/apt", "/var/lib/pam"]},
+    {"id": "log", "name": "Guest Login", "script": "config/login.sh", "configs": ["/etc/lightdm", "/etc/gdm3", "/etc/sddm.conf", "/usr/local/etc/lightdm", "/etc/passwd", "/etc/shadow", "/etc/group", "/etc/gshadow", "/etc/passwd-", "/etc/shadow-", "/etc/group-", "/etc/gshadow-", "/etc/master.passwd", "/etc/pwd.db", "/etc/spwd.db"]},
+    {"id": "per", "name": "File Permissions", "script": "config/file_permissions.sh", "configs": ["/etc", "/usr/local/etc", "/usr/lib/systemd/system", "/usr/share/ca-certificates", "/usr/share/certs", "/etc/pki", "/usr/local/share/ca-certificates", "/usr/local/share/certs", "/lib/security", "/lib64/security", "/usr/lib/security", "/usr/lib64/security", "/boot/grub/grub.cfg", "/boot/grub2/grub.cfg", "/boot/efi/EFI/ubuntu/grub.cfg", "/boot/efi/EFI/centos/grub.cfg", "/boot/efi/EFI/redhat/grub.cfg", "/boot/loader/entries", "/etc/rc.d", "/usr/local/etc/rc.d", "/etc/rc.conf.d", "/usr/local/etc/rc.conf.d"]},
     {"id": "cpkg", "name": "Package Comparison", "script": "compare/compare_pkgs.sh", "logs": ["log/pkgs_log.txt"]},
     {"id": "csvc", "name": "Service Comparison", "script": "compare/compare_services.sh", "logs": ["log/services_log.txt"]},
-    {"id": "mal", "name": "ClamAV Scan", "script": "rm_stuff/clamav.sh", "logs": ["log/clamav.txt"]},
+    {"id": "pkg", "name": "Bad Packages", "script": "rm_stuff/bad_pkg.sh", "edit_packages": True, "configs": ["/etc", "/usr/local/etc"]},
+    {"id": "mal", "name": "Malware and Security Scan", "script": "rm_stuff/malware_scan.sh", "logs": ["log/clamav.txt", "log/lynis.txt"]},
 ]
+
+SERVICES = [
+    {"id": "ufw", "name": "UFW Firewall", "script": "services/ufw.sh", "configs": ["/etc/ufw", "/etc/default/ufw"]},
+]
+
+AUTO_RUN_SCRIPTS = [task["script"] for task in TASKS]
 
 INPUT_FILES = [
     "input/distribution.txt",
@@ -275,6 +281,18 @@ def _all_tasks() -> list[dict[str, Any]]:
     return result
 
 
+def _all_services() -> list[dict[str, Any]]:
+    result = []
+    for service in SERVICES:
+        item = dict(service)
+        item["status"] = _status(item["script"])
+        item["files"] = _files_for_script(item["script"])
+        item["log_files"] = item["files"]["logs"]
+        item["config_files"] = item["files"]["configs"]
+        result.append(item)
+    return result
+
+
 def _task_by_script(script: str) -> dict[str, Any] | None:
     for task in TASKS:
         if task["script"] == script or task.get("second", {}).get("script") == script:
@@ -282,10 +300,17 @@ def _task_by_script(script: str) -> dict[str, Any] | None:
     return None
 
 
+def _service_by_script(script: str) -> dict[str, Any] | None:
+    return next((service for service in SERVICES if service["script"] == script), None)
+
+
 def _config_candidates(script: str, task: dict[str, Any] | None) -> list[str]:
     if not task:
-        return []
-    if task.get("second", {}).get("script") == script:
+        service = _service_by_script(script)
+        if not service:
+            return []
+        candidates = list(service.get("configs", []))
+    elif task.get("second", {}).get("script") == script:
         candidates = list(task["second"].get("configs", []))
     else:
         candidates = list(task.get("configs", []))
@@ -369,6 +394,7 @@ def _execute_script(script: str, run_id: str) -> None:
 
 def _execute_script_impl(script: str, run_id: str) -> None:
     task = _task_by_script(script)
+    service = _service_by_script(script)
     config_candidates = _config_candidates(script, task)
     script_path = ROOT / script
     if not script_path.is_file():
@@ -378,7 +404,7 @@ def _execute_script_impl(script: str, run_id: str) -> None:
     if not privilege:
         _finish_run(script, run_id, 1, "Configure sudo or doas, or use a graphical Linux session with pkexec available; the Flask server stays unprivileged.", {})
         return
-    script_args = task.get("args", []) if task and task.get("script") == script else task.get("second", {}).get("args", []) if task else []
+    script_args = task.get("args", []) if task and task.get("script") == script else task.get("second", {}).get("args", []) if task else service.get("args", []) if service else []
     command = [*privilege, "bash", str(script_path), *(str(ROOT / value) if not Path(value).is_absolute() else value for value in script_args)]
     output_path = ROOT / "log" / "webapp-runs" / f"{run_id}.log"
     try:
@@ -429,14 +455,15 @@ def dashboard():
         selected_distribution = next((line.strip() for line in distribution_file.read_text(encoding="utf-8").splitlines() if line.strip() and not line.lstrip().startswith("#")), "auto")
     except OSError:
         pass
-    return render_template("dashboard.html", tasks=_all_tasks(), inputs=INPUT_FILES, update=UPDATE_ACTION, update_status=update_status, update_files=update_files, aggregate=aggregate, selected_distribution=selected_distribution, update_review=url_for("review_run", backup_id=update_status["backup_id"]) if update_status.get("backup_id") else None)
+    return render_template("dashboard.html", tasks=_all_tasks(), services=_all_services(), inputs=INPUT_FILES, update=UPDATE_ACTION, update_status=update_status, update_files=update_files, aggregate=aggregate, selected_distribution=selected_distribution, update_review=url_for("review_run", backup_id=update_status["backup_id"]) if update_status.get("backup_id") else None)
 
 
 @app.post("/run/<path:script>")
 def run_script(script: str):
     if script != "updates":
         task = _task_by_script(script)
-        if task is None:
+        service = _service_by_script(script)
+        if task is None and service is None:
             abort(404)
     else:
         script = "__updates__"
@@ -446,6 +473,33 @@ def run_script(script: str):
     worker = threading.Thread(target=_execute_updates if script == "__updates__" else _execute_script, args=(run_id,) if script == "__updates__" else (script, run_id), daemon=True)
     worker.start()
     return jsonify({"script": script, "run_id": run_id, "status": "Running", "message": "Running..."}), 202
+
+
+@app.post("/auto-run")
+def auto_run():
+    run_id = f"{int(time.time() * 1000)}-{os.urandom(4).hex()}"
+    worker = threading.Thread(target=_execute_auto_run, args=(run_id,), daemon=True)
+    worker.start()
+    return jsonify({"run_id": run_id, "status": "Running", "message": "Auto-run started."}), 202
+
+
+def _execute_auto_run(run_id: str) -> None:
+    output_path = ROOT / "log" / "webapp-runs" / f"auto-{run_id}.log"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    results = []
+    with output_path.open("ab") as output:
+        for script in AUTO_RUN_SCRIPTS:
+            script_run_id = f"{run_id}-{len(results) + 1}"
+            RUNS[script] = {"status": "Running", "message": "Running from Auto-run...", "exit_code": None, "run_id": script_run_id}
+            print(f"\n===== {script} =====", file=output, flush=True)
+            _execute_script(script, script_run_id)
+            result = _status(script)
+            results.append({"script": script, "status": result["status"], "message": result.get("message", "")})
+            print(f"===== {result['status']}: {result.get('message', '')} =====", file=output, flush=True)
+            if result["status"] != "Ran":
+                break
+    failed = [item for item in results if item["status"] != "Ran"]
+    _finish_run("__auto_run__", run_id, 1 if failed else 0, f"Auto-run complete: {len(failed)} failed out of {len(results)} scripts.", {"output": str(output_path.relative_to(ROOT)), "results": results})
 
 
 def _execute_updates(run_id: str) -> None:
@@ -475,6 +529,13 @@ def _execute_updates(run_id: str) -> None:
 
 @app.get("/status/<path:script>")
 def status(script: str):
+    if script == "auto-run":
+        data = _status("__auto_run__")
+        if data.get("output") and _is_regular_view_file(data["output"]):
+            data["files"] = {"logs": [data["output"]], "configs": []}
+        else:
+            data["files"] = {"logs": [], "configs": []}
+        return jsonify(data)
     if script == "updates":
         script = "__updates__"
         data = _status(script)

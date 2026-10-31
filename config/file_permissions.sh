@@ -30,9 +30,10 @@ secure_auth_permissions || exit 1
 secure_local_login_files || exit 1
 secure_vendor_units_and_trust || exit 1
 secure_boot_paths || exit 1
-for service in ssh apache2 vsftpd; do
-    secure_service_permissions "$service" || exit 1
-done
+secure_service_permissions ssh || exit 1
+secure_service_permissions apache2 || exit 1
+secure_service_permissions vsftpd || exit 1
+secure_service_permissions ufw || exit 1
 
 echo "[+] Configuring important file permissions..."
 

@@ -116,7 +116,7 @@ secure_service_permissions() {
             secure_path /etc/ssl/private/cyberpatriot-vsftpd.key 600 || return 1
             secure_path /etc/ssl/certs/cyberpatriot-vsftpd.pem 644 || return 1 ;;
         ufw)
-            secure_tree /etc/ufw 750 750 || return 1
+            secure_tree /etc/ufw 640 750 || return 1
             secure_path /etc/default/ufw 640 || return 1 ;;
         *) log "FAILED unknown service permission profile: $service"; return 1 ;;
     esac

@@ -13,7 +13,7 @@ source "$SCRIPT_DIR/service_helpers/distribution.sh"
 load_distribution || exit 1
 source "$SCRIPT_DIR/service_helpers/task_paths.sh"
 # CyberPatriot scoring tasks.
-ORDER=(mal ker log pol usr mp3 pkg per sys)
+ORDER=(usr mp3 ker sys pol log per pkg cpkg csvc mal)
 declare -A SCRIPT_MAP=(
     [sys]=config/system_hardening.sh
     [ker]=config/kernel.sh
@@ -23,19 +23,22 @@ declare -A SCRIPT_MAP=(
     [usr]=user_management/user_management.sh
     [mp3]=rm_stuff/rm_mp3+.sh
     [pkg]=rm_stuff/bad_pkg.sh
-    [mal]=rm_stuff/clamav.sh
+    [mal]=rm_stuff/malware_scan.sh
+    [cpkg]=compare/compare_pkgs.sh
+    [csvc]=compare/compare_services.sh
 )
 declare -A DESCRIPTION=(
-    [sys]='Check system components and protect their configuration'
-
-    [ker]='Kernel hardening'
-    [log]='Guest login settings'
-    [pol]='Password policy'
-    [usr]='Audit users/admins against authorized-user lists'
-    [mp3]='Inventory media for second-pass removal (no deletion)'
-    [pkg]='Remove listed packages'
-    [mal]='Scan files with ClamAV'
-    [per]='File permissions'
+    [usr]='User Management (then User Cleanup)'
+    [mp3]='Media Inventory (then Media Cleanup)'
+    [ker]='Kernel Hardening'
+    [sys]='System Components'
+    [pol]='Password Policy'
+    [log]='Guest Login'
+    [per]='File Permissions'
+    [pkg]='Bad Packages'
+    [cpkg]='Package Comparison'
+    [csvc]='Service Comparison'
+    [mal]='Malware Scan (ClamAV and Lynis)'
 )
 resolve_task_paths
 
@@ -137,18 +140,6 @@ else
         status=$?
         log "FAILED sudo apt upgrade (exit $status)"
         exit "$status"
-    fi
-    # Install ClamAV when the scan is selected.
-    if [[ -n "${SELECTED[mal]:-}" ]]; then
-        unset 'COMPLETED[mal]'
-        TASK_STATUS[mal]=not_run
-        save_status || { echo "Cannot save task status to $STATE_FILE" >&2; exit 1; }
-        log 'Ensuring ClamAV is installed'
-        backup_package_configuration || exit 1
-        if ! apt-get install -y clamav; then
-            log 'FAILED installing ClamAV'
-            exit 1
-        fi
     fi
 fi
 declare -A RESULTS=()

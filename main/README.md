@@ -86,8 +86,9 @@ ALL NEW COMMENTS GO DOWN HERE(do not edit or change anything above):
 
 Run `sudo bash main/run_all.sh` to select CyberPatriot tasks. `auto` runs every
 listed task; Enter resumes unfinished tasks. Package removal uses its fixed list
-without prompting. Select `mal` to install ClamAV and scan the filesystem; the
-transcript is saved to `log/clamav.txt`.
+without prompting. Select `mal` to install ClamAV and Lynis when needed, scan the
+filesystem with ClamAV, and run a Lynis system audit. Reports are saved to
+`log/clamav.txt` and `log/lynis.txt`.
 
 The launcher, `main` hardening scripts and media-removal script append to
 `main/all_logs.txt`, regardless of the working directory. Configuration
@@ -129,7 +130,7 @@ Configuration references: [OpenSSH](https://man.openbsd.org/sshd_config),
 | `password_management/pwd_policy.sh` | Creates/configures `login.defs`, `pwquality.conf` and `faillock.conf` for account defaults, password complexity and failed-login lockout. Enables and verifies PAM profiles, preserving backups and refusing incompatible custom stacks. |
 | `rm_stuff/rm_mp3+.sh` | Writes a read-only MP3/MOV/MP4 inventory to `log/media_files(2).txt`; reviewed removal is performed by `rm_stuff/rm_mp3+_2.sh` in the second launcher. |
 | `rm_stuff/bad_pkg.sh` | Removes installed matches from the fixed CyberPatriot package list without prompting. |
-| `rm_stuff/clamav.sh` | Scans the filesystem with ClamAV and writes output to `log/clamav.txt`. |
+| `rm_stuff/malware_scan.sh` | Installs and runs ClamAV and Lynis, writing reports to `log/clamav.txt` and `log/lynis.txt`. |
 
 ### Package and service comparisons
 

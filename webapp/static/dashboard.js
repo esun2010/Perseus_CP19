@@ -85,6 +85,48 @@
     refreshRow(row);
   });
 
+  const autoRow = document.querySelector("[data-auto-run]");
+  if (autoRow) {
+    const button = autoRow.querySelector("[data-auto-run-url]");
+    const message = autoRow.querySelector("[data-status-message]");
+    const pollAuto = async () => {
+      try {
+        const response = await fetch(autoRow.dataset.statusUrl, { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        renderFiles(autoRow, data.files);
+        message.textContent = data.status === "Failed" ? data.message : labelFor(data.status);
+        if (data.status !== "Running") button.disabled = false;
+      } catch (_) { /* Auto-run state remains available through normal task rows. */ }
+    };
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      message.textContent = "Starting...";
+      try {
+        const response = await fetch(button.dataset.autoRunUrl, { method: "POST", headers: { "X-Requested-With": "fetch" } });
+        if (!response.ok) throw new Error("Could not start Auto-run");
+        message.textContent = "Running...";
+      } catch (_) {
+        message.textContent = "Failed to start";
+        button.disabled = false;
+      }
+      pollAuto();
+    });
+    pollAuto();
+    window.setInterval(pollAuto, 900);
+  }
+
+  const serviceSelect = document.querySelector("[data-service-select]");
+  if (serviceSelect) {
+    const showSelectedService = () => {
+      document.querySelectorAll("[data-service-script]").forEach((row) => {
+        row.hidden = row.dataset.serviceScript !== serviceSelect.value;
+      });
+    };
+    serviceSelect.addEventListener("change", showSelectedService);
+    showSelectedService();
+  }
+
   document.querySelectorAll("[data-script-visibility]").forEach((button) => {
     const id = button.dataset.scriptVisibility;
     const content = document.querySelector(`[data-script-content="${CSS.escape(id)}"]`);
