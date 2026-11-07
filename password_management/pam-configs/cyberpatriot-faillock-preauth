@@ -1,3 +1,5 @@
+# /usr/share/pam-configs/faillock_notify
+
 Name: CyberPatriot failed-login check and reset
 Default: no
 Priority: 1024
