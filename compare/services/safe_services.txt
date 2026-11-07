@@ -104,7 +104,6 @@
   systemd-binfmt.service                                                                    loaded    active     exited        Set Up Additional Binary Formats
   systemd-boot-system-token.service                                                         loaded    inactive   dead          Store a System Token in an EFI Variable
   systemd-fsck-root.service                                                                 loaded    inactive   dead          File System Check on Root Device
-  systemd-fsck@dev-disk-by\x2duuid-c09543d9\x2dc211\x2d4a2c\x2d9c36\x2d87ce4a851056.service loaded    active     exited        File System Check on /dev/disk/by-uuid/c09543d9-c211-4a2c-9c36-87ce4a851056
   systemd-fsckd.service                                                                     loaded    inactive   dead          File System Check Daemon to report status
 ● systemd-hwdb-update.service                                                               not-found inactive   dead          systemd-hwdb-update.service
   systemd-initctl.service                                                                   loaded    inactive   dead          initctl Compatibility Daemon

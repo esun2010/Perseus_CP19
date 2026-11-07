@@ -284,7 +284,6 @@ fonts-yrsa-rasa/jammy,jammy,now 2.005-1 all [installed]
 foomatic-db-compressed-ppds/jammy,jammy,now 20220223-0ubuntu1 all [installed]
 fprintd/jammy-updates,now 1.94.2-1ubuntu0.22.04.1 amd64 [installed]
 friendly-recovery/jammy,jammy,now 0.2.42 all [installed]
-ftp/jammy,jammy,now 20210827-4build1 all [installed]
 fuse3/jammy,now 3.10.5-1build1 amd64 [installed]
 fwupd-signed/jammy-updates,jammy-security,now 1.51.1~22.04.1+1.4-0ubuntu0.1 amd64 [installed]
 fwupd/jammy-updates,now 2.0.20-1ubuntu2~22.04.2 amd64 [installed]
@@ -2110,3 +2109,32 @@ zip/jammy,now 3.0-12build2 amd64 [installed]
 zlib1g/jammy-updates,jammy-security,now 1:1.2.11.dfsg-2ubuntu9.2 amd64 [installed]
 zstd/jammy,now 1.4.8+dfsg-3build1 amd64 [installed]
 
+# Additional trusted packages from round 1 deb
+build-essential
+firefox-locale-en
+g++
+g++-11
+javascript-common
+libexpat1-dev
+libjs-jquery
+libjs-sphinxdoc
+libjs-underscore
+libpython3-dev
+libpython3.10-dev
+libstdc++-11-dev
+meld
+ntp
+ntpdate
+python3-dev
+python3-distutils
+python3-lib2to3
+python3-pip
+python3-pip-whl
+python3-setuptools
+python3-setuptools-whl
+python3-venv
+python3-wheel
+python3.10-dev
+python3.10-venv
+youtube-dl
+zlib1g-dev

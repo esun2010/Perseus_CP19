@@ -9,25 +9,16 @@
   <section class="panel"><div class="section-heading"><div><h2>Meld and Configuration Backups</h2></div><a class="button secondary" href="{{ url_for('meld_dashboard') }}">Open Meld and Backups</a></div><p>Compare files or directories, create backups, review script changes, or restore a saved configuration.</p></section>
 
   <section class="panel" aria-labelledby="script-order-title"><div class="section-heading"><div><h2 id="script-order-title">Script order</h2></div><p>Displayed in the same order as the dashboard sections below.</p></div>
-    <ol class="script-order-list"><li>Input Files</li>{% for task in tasks %}<li>{{ task.name }}{% if task.second %} (then {{ task.second.name }}){% endif %}</li>{% endfor %}<li>POSSIBLE SERVICES (future reference; not active)</li><li>Aggregate logs, when available</li></ol>
+    <ol class="script-order-list">{% for task in tasks %}<li>{{ task.name }}{% if task.second %} (then {{ task.second.name }}){% endif %}</li>{% endfor %}</ol>
   </section>
 
   <section class="panel auto-run-panel" aria-labelledby="auto-run-title">
-    <div class="section-heading"><div><h2 id="auto-run-title">Auto-run</h2></div><p>Runs each numbered task in order. User Cleanup, Media Cleanup, and all Services are skipped.</p></div>
+    <div class="section-heading"><div><h2 id="auto-run-title">Auto-run</h2></div><p>Runs eligible scripts concurrently. User Management, Media Inventory, Bad Packages, Malware Scan, cleanup passes, and Services are excluded.</p></div>
     <div class="script-row" data-auto-run data-status-url="{{ url_for('status', script='auto-run') }}">
-      <div class="script-label"><strong>Run all eligible scripts</strong><span>Stops at the first failed task. Individual tasks retain their own status and logs.</span></div>
+      <div class="script-label"><strong>Run all eligible scripts</strong><span>Runs seven scripts at the same time. Each task keeps its own status and logs.</span></div>
       <div class="run-controls"><span class="status-message" data-status-message>Ready</span><button class="button primary" data-auto-run-url="{{ url_for('auto_run') }}">Run all</button></div>
       <div class="file-actions" data-files-container></div>
       <div class="file-actions" data-review-container></div>
-    </div>
-  </section>
-
-  <section class="panel" aria-labelledby="inputs-title">
-    <div class="section-heading"><div><span class="section-number">1</span><h2 id="inputs-title">Input Files</h2></div><p>Original files read by the existing scripts.</p></div>
-    <div class="input-list">
-      {% for file in inputs %}
-      <div class="input-row"><span>{{ file }}</span><a class="button secondary" href="{{ url_for('edit_input', relpath=file) }}">Edit</a></div>
-      {% endfor %}
     </div>
   </section>
 
@@ -63,10 +54,6 @@
   </section>
   {% endfor %}
 
-  <section class="panel future-services-panel" aria-label="Future service tasks">
-    <div class="section-heading"><div><span class="section-number">{{ tasks|length + 2 }}</span><h2>POSSIBLE SERVICES</h2></div><p>Reserved for future service scripts; not part of Auto-run.</p></div>
-  </section>
-
   <section class="panel services-panel" aria-labelledby="services-title">
     <div class="section-heading"><div><span class="section-number">{{ tasks|length + 3 }}</span><h2 id="services-title">Services</h2></div><p>Choose a service configuration to run. Services are excluded from Auto-run.</p></div>
     <label for="service-select">Service</label>
@@ -82,13 +69,6 @@
     </div>
     {% endfor %}
   </section>
-
-  {% for file in aggregate %}
-  <section class="panel aggregate-panel">
-    <div class="section-heading"><div><span class="section-number">{{ tasks|length + loop.index + 1 }}</span><h2>{% if file.endswith('all_logs.txt') %}Aggregate Log{% else %}Second-pass Aggregate Log{% endif %}</h2></div><span class="script-path">{{ file }}</span></div>
-    <div class="file-actions"><a class="button file-button" href="{{ url_for('view_file', path=file) }}">View {{ file }}</a></div>
-  </section>
-  {% endfor %}
 
   <section class="panel update-panel" aria-labelledby="updates-title">
     <div class="section-heading"><div><h2 id="updates-title">Updates and APT Reset</h2></div><p>{{ update.description }}</p></div>

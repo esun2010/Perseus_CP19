@@ -14,6 +14,8 @@ import sys
 import threading
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +28,11 @@ HELPER_PATH = ROOT / "main" / "dashboard_file_ops.py"
 STATE_LOCK = threading.RLock()
 RUNS: dict[str, dict[str, Any]] = {}
 COMPARE_LOCKS: dict[str, threading.Lock] = {}
+PASSWORD_POLICY_PAM_FILES = (
+    "/etc/pam.d/common-auth",
+    "/etc/pam.d/common-account",
+    "/etc/pam.d/common-password",
+)
 
 app = Flask(__name__, template_folder=str(ROOT / "webapp" / "templates"), static_folder=str(ROOT / "webapp" / "static"))
 app.secret_key = os.environ.get("CYBERPATRIOT_FLASK_SECRET", "local-cyberpatriot-dashboard")
@@ -49,7 +56,13 @@ SERVICES = [
     {"id": "ufw", "name": "UFW Firewall", "script": "services/ufw.sh", "configs": ["/etc/ufw", "/etc/default/ufw"]},
 ]
 
-AUTO_RUN_SCRIPTS = [task["script"] for task in TASKS]
+AUTO_RUN_EXCLUDED_SCRIPTS = {
+    "rm_stuff/bad_pkg.sh",
+    "user_management/user_management.sh",
+    "rm_stuff/rm_mp3+.sh",
+    "rm_stuff/malware_scan.sh",
+}
+AUTO_RUN_SCRIPTS = [task["script"] for task in TASKS if task["script"] not in AUTO_RUN_EXCLUDED_SCRIPTS]
 
 INPUT_FILES = [
     "input/distribution.txt",
@@ -168,6 +181,7 @@ def _resolve_repo_file(relpath: str) -> Path:
         with STATE_LOCK:
             state = _load_state()
         known = {item for paths in state.get("modified", {}).values() for item in paths}
+        known.update(PASSWORD_POLICY_PAM_FILES)
         if str(supplied) not in known:
             abort(404)
         return supplied
@@ -185,6 +199,28 @@ def _is_regular_view_file(relpath: str) -> bool:
         return candidate.is_file() and not candidate.is_symlink()
     except Exception:
         return False
+
+
+def _write_error_log(run_id: str, output_path: Path, stderr_path: Path | None, exit_code: int) -> str:
+    """Write a separate, error-only record for a failed run."""
+    error_path = ROOT / "log" / "webapp-runs" / f"{run_id}-errors.log"
+    error_path.parent.mkdir(parents=True, exist_ok=True)
+    pattern = re.compile(r"\b(failed|failure|error|critical|traceback|exception)\b", re.IGNORECASE)
+    with error_path.open("w", encoding="utf-8", errors="replace") as errors:
+        if stderr_path and stderr_path.is_file():
+            with stderr_path.open("r", encoding="utf-8", errors="replace") as stderr:
+                for line in stderr:
+                    if line.strip():
+                        errors.write(line)
+        if output_path.is_file():
+            with output_path.open("r", encoding="utf-8", errors="replace") as output:
+                for line in output:
+                    if pattern.search(line):
+                        errors.write(line)
+        errors.flush()
+        if error_path.stat().st_size == 0:
+            errors.write(f"Script exited with status {exit_code}.\n")
+    return str(error_path.relative_to(ROOT))
 
 
 def _file_signature(path: Path) -> str | None:
@@ -254,6 +290,10 @@ def _files_for_script(script_path: str) -> dict[str, list[str]]:
     output = _status(script_path).get("output")
     if output and _is_regular_view_file(output):
         logs.append(output)
+    run_status = _status(script_path)
+    error_output = run_status.get("error_output")
+    if run_status.get("status") == "Failed" and error_output and _is_regular_view_file(error_output):
+        logs.append(error_output)
     modified = []
     with STATE_LOCK:
         state = _load_state()
@@ -263,6 +303,10 @@ def _files_for_script(script_path: str) -> dict[str, list[str]]:
                 modified.append(path)
         except Exception:
             continue
+    if script_path == "password_management/pwd_policy.sh":
+        for path in PASSWORD_POLICY_PAM_FILES:
+            if path not in modified and _is_regular_view_file(path):
+                modified.append(path)
     return {"logs": logs, "configs": modified}
 
 
@@ -357,7 +401,7 @@ def _config_candidates(script: str, task: dict[str, Any] | None) -> list[str]:
     return result
 
 
-def _run_update_steps(run_id: str) -> list[str]:
+def _run_update_steps(run_id: str, stderr_path: Path) -> list[str]:
     env = os.environ.copy()
     env["PATH"] = "/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/sbin:/usr/local/bin"
     env["ROOT"] = str(ROOT)
@@ -370,16 +414,19 @@ def _run_update_steps(run_id: str) -> list[str]:
         raise RuntimeError("The existing distribution detector could not identify a supported system; update action was not run.")
     output_path = ROOT / "log" / "webapp-runs" / f"{run_id}.log"
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("ab") as output:
+    with output_path.open("ab") as output, stderr_path.open("wb") as errors:
         command = ["bash", "-c", "set -euo pipefail; " + steps]
         output.write(("$ " + " ".join(command) + "\n").encode())
         output.flush()
         privilege = _privilege_prefix()
         if not privilege:
             raise RuntimeError("Configure sudo or doas, or launch from a graphical Linux session with pkexec available; Flask remains unprivileged.")
-        proc = subprocess.run([*privilege, *command], cwd=ROOT, env=env, stdout=output, stderr=subprocess.STDOUT, check=False)
+        proc = subprocess.run([*privilege, *command], cwd=ROOT, env=env, stdout=output, stderr=errors, check=False)
         if proc.returncode != 0:
             raise subprocess.CalledProcessError(proc.returncode, command)
+    if stderr_path.is_file():
+        with output_path.open("ab") as output, stderr_path.open("rb") as errors:
+            shutil.copyfileobj(errors, output)
     return [str(output_path.relative_to(ROOT))]
 
 
@@ -407,6 +454,7 @@ def _execute_script_impl(script: str, run_id: str) -> None:
     script_args = task.get("args", []) if task and task.get("script") == script else task.get("second", {}).get("args", []) if task else service.get("args", []) if service else []
     command = [*privilege, "bash", str(script_path), *(str(ROOT / value) if not Path(value).is_absolute() else value for value in script_args)]
     output_path = ROOT / "log" / "webapp-runs" / f"{run_id}.log"
+    stderr_path = output_path.with_name(f"{run_id}-stderr.tmp")
     try:
         backup = _create_backup(config_candidates, run_id, script) if config_candidates else {"id": None}
         if backup.get("error"):
@@ -415,11 +463,16 @@ def _execute_script_impl(script: str, run_id: str) -> None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         env = os.environ.copy()
         env["PATH"] = "/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/sbin:/usr/local/bin"
-        with output_path.open("ab") as output:
-            proc = subprocess.Popen(command, cwd=ROOT, env=env, stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
+        with output_path.open("ab") as output, stderr_path.open("wb") as errors:
+            proc = subprocess.Popen(command, cwd=ROOT, env=env, stdout=output, stderr=errors, start_new_session=True)
             if RUNS.get(script, {}).get("run_id") == run_id:
                 RUNS[script].update({"status": "Running", "message": "Running...", "exit_code": None, "pid": proc.pid, "output": str(output_path.relative_to(ROOT))})
             code = proc.wait()
+        error_output = _write_error_log(run_id, output_path, stderr_path, code) if code != 0 else None
+        if stderr_path.is_file():
+            with output_path.open("ab") as output, stderr_path.open("rb") as errors:
+                shutil.copyfileobj(errors, output)
+        stderr_path.unlink(missing_ok=True)
         changes = _inspect_backup(backup["id"]) if backup.get("id") else []
         changed = [entry["path"] for entry in changes if entry["status"] in ("changed", "created", "deleted")]
         if RUNS.get(script, {}).get("run_id") == run_id:
@@ -428,9 +481,14 @@ def _execute_script_impl(script: str, run_id: str) -> None:
                 state.setdefault("modified", {})[script] = changed
                 _save_state(state)
         message = "Ran successfully" if code == 0 else "Failed"
-        _finish_run(script, run_id, code, message, {"output": str(output_path.relative_to(ROOT)), "modified": changed, "backup_id": backup["id"], "changes": changes})
+        _finish_run(script, run_id, code, message, {"output": str(output_path.relative_to(ROOT)), "error_output": error_output, "modified": changed, "backup_id": backup["id"], "changes": changes})
     except OSError as exc:
-        _finish_run(script, run_id, 127, f"Failed to launch: {exc}", {})
+        error_output = _write_error_log(run_id, output_path, stderr_path if stderr_path.exists() else None, 127) if output_path.exists() else None
+        if error_output:
+            with (ROOT / error_output).open("a", encoding="utf-8") as errors:
+                errors.write(f"Failed to launch: {exc}\n")
+        stderr_path.unlink(missing_ok=True)
+        _finish_run(script, run_id, 127, f"Failed to launch: {exc}", {"error_output": error_output})
 
 
 def _finish_run(script: str, run_id: str, code: int, message: str, extra: dict[str, Any]) -> None:
@@ -486,18 +544,30 @@ def auto_run():
 def _execute_auto_run(run_id: str) -> None:
     output_path = ROOT / "log" / "webapp-runs" / f"auto-{run_id}.log"
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    script_run_ids = {script: f"{run_id}-{index}" for index, script in enumerate(AUTO_RUN_SCRIPTS, start=1)}
+    for script, script_run_id in script_run_ids.items():
+        RUNS[script] = {"status": "Running", "message": "Running from Auto-run...", "exit_code": None, "run_id": script_run_id}
+    if RUNS.get("__auto_run__", {}).get("run_id") == run_id:
+        RUNS["__auto_run__"]["output"] = str(output_path.relative_to(ROOT))
     results = []
     with output_path.open("ab") as output:
+        print("Starting eligible scripts concurrently:", file=output, flush=True)
         for script in AUTO_RUN_SCRIPTS:
-            script_run_id = f"{run_id}-{len(results) + 1}"
-            RUNS[script] = {"status": "Running", "message": "Running from Auto-run...", "exit_code": None, "run_id": script_run_id}
-            print(f"\n===== {script} =====", file=output, flush=True)
-            _execute_script(script, script_run_id)
-            result = _status(script)
-            results.append({"script": script, "status": result["status"], "message": result.get("message", "")})
-            print(f"===== {result['status']}: {result.get('message', '')} =====", file=output, flush=True)
-            if result["status"] != "Ran":
-                break
+            print(f"===== {script} =====", file=output, flush=True)
+        with ThreadPoolExecutor(max_workers=max(1, len(AUTO_RUN_SCRIPTS))) as executor:
+            futures = {
+                executor.submit(_execute_script, script, script_run_ids[script]): script
+                for script in AUTO_RUN_SCRIPTS
+            }
+            for future in as_completed(futures):
+                script = futures[future]
+                try:
+                    future.result()
+                except Exception as exc:
+                    _finish_run(script, script_run_ids[script], 1, f"Failed during Auto-run: {exc}", {})
+                result = _status(script)
+                results.append({"script": script, "status": result["status"], "message": result.get("message", "")})
+                print(f"===== {result['status']}: {script}: {result.get('message', '')} =====", file=output, flush=True)
     failed = [item for item in results if item["status"] != "Ran"]
     _finish_run("__auto_run__", run_id, 1 if failed else 0, f"Auto-run complete: {len(failed)} failed out of {len(results)} scripts.", {"output": str(output_path.relative_to(ROOT)), "results": results})
 
@@ -508,15 +578,21 @@ def _execute_updates(run_id: str) -> None:
         _finish_run("__updates__", run_id, 1, f"Backup failed; update was not run: {backup['error']}", {"backup_error": backup["error"]})
         return
     output_path = ROOT / "log" / "webapp-runs" / f"{run_id}.log"
+    stderr_path = output_path.with_name(f"{run_id}-stderr.tmp")
     if RUNS.get("__updates__", {}).get("run_id") == run_id:
         RUNS["__updates__"]["output"] = str(output_path.relative_to(ROOT))
     try:
-        outputs = _run_update_steps(run_id)
+        outputs = _run_update_steps(run_id, stderr_path)
         code, message = 0, "Ran successfully"
     except (OSError, RuntimeError, subprocess.CalledProcessError) as exc:
         code = getattr(exc, "returncode", 127)
         outputs = [str(output_path.relative_to(ROOT))]
         message = f"Failed (exit {code})"
+    error_output = _write_error_log(run_id, output_path, stderr_path if stderr_path.exists() else None, code) if code != 0 else None
+    if stderr_path.is_file():
+        with output_path.open("ab") as output, stderr_path.open("rb") as errors:
+            shutil.copyfileobj(errors, output)
+    stderr_path.unlink(missing_ok=True)
     changes = _inspect_backup(backup["id"])
     changed = [entry["path"] for entry in changes if entry["status"] in ("changed", "created", "deleted")]
     if RUNS.get("__updates__", {}).get("run_id") == run_id:
@@ -524,17 +600,23 @@ def _execute_updates(run_id: str) -> None:
             state = _load_state()
             state.setdefault("modified", {})["__updates__"] = changed
             _save_state(state)
-    _finish_run("__updates__", run_id, code, message, {"output": outputs[0] if outputs else None, "modified": changed, "backup_id": backup["id"], "changes": changes})
+    _finish_run("__updates__", run_id, code, message, {"output": outputs[0] if outputs else None, "error_output": error_output, "modified": changed, "backup_id": backup["id"], "changes": changes})
 
 
 @app.get("/status/<path:script>")
 def status(script: str):
     if script == "auto-run":
         data = _status("__auto_run__")
+        logs = []
         if data.get("output") and _is_regular_view_file(data["output"]):
-            data["files"] = {"logs": [data["output"]], "configs": []}
-        else:
-            data["files"] = {"logs": [], "configs": []}
+            logs.append(data["output"])
+        if data.get("status") == "Failed":
+            for result in data.get("results", []):
+                run = _status(result.get("script", ""))
+                error_output = run.get("error_output")
+                if run.get("status") == "Failed" and error_output and _is_regular_view_file(error_output):
+                    logs.append(error_output)
+        data["files"] = {"logs": logs, "configs": []}
         return jsonify(data)
     if script == "updates":
         script = "__updates__"
@@ -551,6 +633,9 @@ def _files_for_updates() -> dict[str, list[str]]:
     logs = []
     if status_data.get("output") and _is_regular_view_file(status_data["output"]):
         logs.append(status_data["output"])
+    error_output = status_data.get("error_output")
+    if status_data.get("status") == "Failed" and error_output and _is_regular_view_file(error_output):
+        logs.append(error_output)
     configs = []
     for path in status_data.get("modified", []):
         try:

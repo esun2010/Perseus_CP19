@@ -25,8 +25,8 @@ media_review() {
            -o -path /var/backups -o -path "${CP_BACKUP_ROOT:-/var/backups/cyberpatriot}" -o -path /var/db/cyberpatriot -o -name .zfs \) -prune -o \
         -type f \( -iname '*.mp3' -o -iname '*.flac' -o -iname '*.m4a' -o -iname '*.ogg' \
             -o -iname '*.mov' -o -iname '*.mp4' -o -iname '*.avi' -o -iname '*.mpg' \
-            -o -iname '*.mpeg' -o -iname '*.flv' -o -iname '*.gif' -o -iname '*.png' \
-            -o -iname '*.jpg' -o -iname '*.jpeg' \) -print0 > "$inventory"; then
+            -o -iname '*.mpeg' -o -iname '*.flv' -o -iname '*.zip' \
+            \) -print0 > "$inventory"; then
         rm -f "$inventory"; log 'FAILED media inventory; previous review log retained'; return 1
     fi
     local temp
@@ -57,7 +57,7 @@ media_cleanup() {
         [[ "$signature" =~ ^[0-9]+:[0-9]+:[0-9]+:[0-9]+:[0-9]+$ && "$path" == /* && "$path" != *$'\r'* ]] || return 1
         case "$path" in /proc/*|/sys/*|/dev/*|/run/*|/var/backups/*|/var/db/cyberpatriot/*) log "FAILED protected media path: $path"; return 1;; esac
         [[ "$path" != "${CP_BACKUP_ROOT:-/var/backups/cyberpatriot}/"* ]] || { log 'FAILED media is inside the backup directory'; return 1; }
-        case "${path,,}" in *.mp3|*.flac|*.m4a|*.ogg|*.mov|*.mp4|*.avi|*.mpg|*.mpeg|*.flv|*.gif|*.png|*.jpg|*.jpeg) ;; *) return 1;; esac
+        case "${path,,}" in *.mp3|*.flac|*.m4a|*.ogg|*.mov|*.mp4|*.avi|*.mpg|*.mpeg|*.flv|*.zip) ;; *) return 1;; esac
         if [[ ! -e "$path" && ! -L "$path" ]]; then log "ALREADY ABSENT: $path"; continue; fi
         resolved=$(realpath "$path") || return 1
         [[ "$resolved" == "$path" && ! -L "$path" && -f "$path" ]] || { log "FAILED changed/linked path: $path"; return 1; }

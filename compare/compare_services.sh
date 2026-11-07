@@ -59,15 +59,15 @@ cleanup() { rm -f -- "$inventory_tmp" "$output_tmp"; rm -rf -- "$work_dir"; }
 trap cleanup EXIT
 
 normalize_name() {
-    local name=$1
-    if [[ "$CP_DISTRO" == freebsd ]]; then
-        name=${name##*/}
-        name=${name%.sh}
+    local name="$1"
+
+    if [[ "$CP_DISTRO" == "freebsd" ]]; then
         [[ "$name" =~ ^[[:alnum:]_.+-]+$ ]] || return 1
     else
-        [[ "$name" =~ ^[[:alnum:]_.@+-]+(\.service)?$ ]] || return 1
-        [[ "$name" == *.service ]] || name+='.service'
+        [[ "$name" =~ ^([[:alnum:]_.@+-]|\\x[[:xdigit:]]{2})+(\.service)?$ ]] || return 1
+        [[ "$name" == *.service ]] || name+=".service"
     fi
+
     printf '%s\n' "$name"
 }
 

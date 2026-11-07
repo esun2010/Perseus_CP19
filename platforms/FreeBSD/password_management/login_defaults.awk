@@ -1,4 +1,4 @@
-# Preserve all login classes and rewrite only the default class capabilities.
+# Preserve all login classes while applying password aging to every class.
 function flush_record(    clean,n,field,i,names,aliases,j,isdefault,result) {
     clean = record
     gsub(/\\\n[ \t]*/, "", clean)
@@ -7,8 +7,8 @@ function flush_record(    clean,n,field,i,names,aliases,j,isdefault,result) {
     names = split(field[1], aliases, "[|]")
     isdefault = 0
     for (j=1; j<=names; j++) if (aliases[j] == "default") isdefault=1
-    if (!isdefault) { printf "%s", record; record=""; return }
-    defaults++
+    classes++
+    if (isdefault) defaults++
     result=field[1] ":passwordtime=90d:warnpassword=7d:"
     for (i=2; i<=n; i++) {
         if (field[i] ~ /^[ \t]*$/) continue
@@ -23,4 +23,4 @@ function flush_record(    clean,n,field,i,names,aliases,j,isdefault,result) {
     record=record $0 "\n"
     if ($0 !~ /\\$/) flush_record()
 }
-END { if (record != "" || defaults != 1) exit 2 }
+END { if (record != "" || defaults != 1 || classes == 0) exit 2 }
