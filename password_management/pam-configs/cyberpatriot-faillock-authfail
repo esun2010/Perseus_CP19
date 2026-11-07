@@ -1,3 +1,5 @@
+# /usr/share/pam-configs/faillock
+
 Name: CyberPatriot failed-login recording
 Default: no
 Priority: -1024
