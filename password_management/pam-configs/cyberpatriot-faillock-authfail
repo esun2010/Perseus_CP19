@@ -2,7 +2,7 @@
 
 Name: CyberPatriot failed-login recording
 Default: no
-Priority: -1024
+Priority: 0
 Auth-Type: Primary
 Auth:
 	[default=die] pam_faillock.so authfail
