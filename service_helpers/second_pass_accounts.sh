@@ -2,6 +2,7 @@
 # Shared local-account audit and explicitly invoked second-pass cleanup.
 SECOND_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$SECOND_ROOT/config/logging.sh"
+source "$SECOND_ROOT/service_helpers/authorized_accounts.sh"
 
 account_platform_init() {
     case "$(uname -s)" in
@@ -25,35 +26,18 @@ prepare_review_logs() {
     done
 }
 
-read_authorized_list() {
-    local file="$1" line skip_password=0
-    local -n dest="$2"
-    [[ -f "$file" && ! -L "$file" ]] || return 1
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        if [[ "$file" == */auth_admins.txt ]] && ((skip_password)); then skip_password=0; continue; fi
-        line=${line%%#*}; line=${line//$'\r'/}
-        line="${line#"${line%%[![:space:]]*}"}"; line="${line%"${line##*[![:space:]]}"}"
-        [[ -n "$line" ]] || continue
-        [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_.-]*\$?$ ]] || { log "FAILED invalid username in $file"; return 1; }
-        dest["$line"]=1
-if [[ "$file" == */auth_admins.txt ]]; then
-    skip_password=1
-fi
-done < "$file"
-
-return 0
-}
-
 local_account_records() {
     if [[ "$ACCOUNT_PLATFORM" == freebsd ]]; then pw usershow -7 -a
     else cat /etc/passwd; fi
 }
 
 load_authorized_accounts() {
+    parse_authorized_accounts "$SECOND_ROOT/input/authorized_accounts.txt" || return 1
     AUTH_USERS=(); AUTH_ADMINS=()
-    read_authorized_list "$SECOND_ROOT/input/auth_users.txt" AUTH_USERS || return 1
-    read_authorized_list "$SECOND_ROOT/input/auth_admins.txt" AUTH_ADMINS || return 1
-    local name real_admin=0 uid
+    local name
+    for name in "${!AUTHORIZED_USERS[@]}"; do AUTH_USERS["$name"]=1; done
+    for name in "${!AUTHORIZED_ADMINS[@]}"; do AUTH_ADMINS["$name"]=1; done
+    local real_admin=0 uid
     for name in "${!AUTH_ADMINS[@]}"; do
         [[ "$name" == root ]] || real_admin=1
         AUTH_USERS["$name"]=1

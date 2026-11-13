@@ -15,7 +15,7 @@
   <section class="panel auto-run-panel" aria-labelledby="auto-run-title">
     <div class="section-heading"><div><h2 id="auto-run-title">Auto-run</h2></div><p>Runs eligible scripts concurrently. User Management, Media Inventory, Bad Packages, Malware Scan, cleanup passes, and Services are excluded.</p></div>
     <div class="script-row" data-auto-run data-status-url="{{ url_for('status', script='auto-run') }}">
-      <div class="script-label"><strong>Run all eligible scripts</strong><span>Runs seven scripts at the same time. Each task keeps its own status and logs.</span></div>
+      <div class="script-label"><strong>Run all eligible scripts</strong><span>Runs eight scripts at the same time. Each task keeps its own status and logs.</span></div>
       <div class="run-controls"><span class="status-message" data-status-message>Ready</span><button class="button primary" data-auto-run-url="{{ url_for('auto_run') }}">Run all</button></div>
       <div class="file-actions" data-files-container></div>
       <div class="file-actions" data-review-container></div>
@@ -53,6 +53,14 @@
     </div>
   </section>
   {% endfor %}
+
+  <section class="panel" aria-labelledby="comparison-actions-title">
+    <div class="section-heading"><div><h2 id="comparison-actions-title">Extra packages and services</h2></div><p>Run Package Comparison or Service Comparison to refresh these lists. Actions apply immediately.</p></div>
+    <h3>Extra packages</h3>
+    {% if comparison_actions.packages %}<div class="action-list">{% for item in comparison_actions.packages %}<div class="backup-item"><strong>{{ item }}</strong><form method="post" action="{{ url_for('manage_comparison_item') }}"><input type="hidden" name="kind" value="packages"><input type="hidden" name="item" value="{{ item }}"><button class="button danger" type="submit">Remove package</button></form></div>{% endfor %}</div>{% else %}<p>No package findings loaded. Run Package Comparison to populate this list.</p>{% endif %}
+    <h3>Extra services</h3>
+    {% if comparison_actions.services %}<div class="action-list">{% for item in comparison_actions.services %}<div class="backup-item"><strong>{{ item }}</strong><form method="post" action="{{ url_for('manage_comparison_item') }}"><input type="hidden" name="kind" value="services"><input type="hidden" name="item" value="{{ item }}"><button class="button danger" type="submit">Disable service</button></form></div>{% endfor %}</div>{% else %}<p>No service findings loaded. Run Service Comparison to populate this list.</p>{% endif %}
+  </section>
 
   <section class="panel services-panel" aria-labelledby="services-title">
     <div class="section-heading"><div><span class="section-number">{{ tasks|length + 3 }}</span><h2 id="services-title">Services</h2></div><p>Choose a service configuration to run. Services are excluded from Auto-run.</p></div>

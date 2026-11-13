@@ -6,7 +6,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../config/logging.sh"
 [[ $EUID -eq 0 ]] || { echo 'Run this script as root.' >&2; exit 1; }
-BAD_PACKAGES=(nmap netcat netcat-openbsd netcat-traditional john hydra medusa ophcrack hashcat wireshark aircrack-ng kismet telnet rsh-server xinetd tor deluge transmission sqlmap nikto)
+BAD_PACKAGES=(nmap netcat netcat-openbsd netcat-traditional john hydra medusa ophcrack hashcat wireshark wireshark-common wireshark-qt aisleriot aisleriot-data doona xprobe aircrack-ng kismet telnet rsh-server xinetd tor deluge transmission sqlmap nikto)
 for pkg in "${BAD_PACKAGES[@]}"; do
     package_status=$(dpkg-query -W -f='${db:Status-Status}' -- "$pkg" 2>/dev/null) || package_status=absent
     if [[ "$package_status" == installed ]]; then

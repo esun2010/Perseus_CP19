@@ -15,7 +15,6 @@ import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -39,13 +38,14 @@ app.secret_key = os.environ.get("CYBERPATRIOT_FLASK_SECRET", "local-cyberpatriot
 
 # Dashboard order follows the requested task flow.
 TASKS = [
-    {"id": "usr", "name": "User Management", "script": "user_management/user_management.sh", "logs": ["log/unauth_users(2).txt", "log/unauth_admins(2).txt", "log/uid_zero_users.txt"], "edit_lists": [("Edit Authorized Users", "input/auth_users.txt"), ("Edit Authorized Admins", "input/auth_admins.txt")], "second": {"name": "User Cleanup", "script": "user_management/user_management_2.sh", "logs": ["log/user_management(2).txt"]}},
+    {"id": "usr", "name": "User Management", "script": "user_management/user_management.sh", "logs": ["log/unauth_users(2).txt", "log/unauth_admins(2).txt", "log/uid_zero_users.txt"], "edit_lists": [("Edit Authorized Accounts", "input/authorized_accounts.txt")], "second": {"name": "User Cleanup", "script": "user_management/user_management_2.sh", "logs": ["log/user_management(2).txt"]}},
     {"id": "mp3", "name": "Media Inventory", "script": "rm_stuff/rm_mp3+.sh", "logs": ["log/media_files(2).txt"], "second": {"name": "Media Cleanup", "script": "rm_stuff/rm_mp3+_2.sh", "logs": ["log/media_cleanup(2).txt"]}},
     {"id": "ker", "name": "Kernel Hardening", "script": "config/kernel.sh", "configs": ["/etc/sysctl.d/99-hardening.conf", "/etc/sysctl.conf", "/etc/sudoers", "/etc/polkit-1/rules.d/00-cyberpatriot-admins.rules", "/usr/local/etc/sudoers", "/usr/local/etc/polkit-1/rules.d", "/etc/rc.conf", "/etc/fstab"]},
     {"id": "sys", "name": "System Components", "script": "config/system_hardening.sh", "configs": ["/etc/nsswitch.conf", "/etc/ssl/openssl.cnf", "/etc/ssl/private", "/etc/ssl/certs", "/etc/ssl/untrusted", "/etc/default/grub", "/boot/grub/grub.cfg", "/boot/grub2/grub.cfg", "/boot/loader.conf", "/boot/loader.conf.local", "/boot/loader.rc", "/boot/loader.conf.d", "/boot/loader/entries", "/etc/selinux/config", "/etc/dhcp/dhclient.conf", "/etc/dhcp/dhclient-enter-hooks.d", "/etc/dhcp/dhclient-exit-hooks.d", "/etc/sysctl.conf", "/etc/rc.conf", "/etc/rc.conf.local", "/etc/fstab", "/etc/hosts", "/usr/lib/systemd/system", "/usr/share/ca-certificates", "/usr/share/certs", "/etc/pki", "/usr/local/share/ca-certificates", "/usr/local/share/certs", "/usr/local/etc/ssl/certs", "/etc/rc.d", "/usr/local/etc/rc.d", "/etc/rc.conf.d", "/usr/local/etc/rc.conf.d"]},
-    {"id": "pol", "name": "Password Policy", "script": "password_management/pwd_policy.sh", "configs": ["/etc/login.defs", "/etc/security/pwquality.conf", "/etc/security/faillock.conf", "/etc/pam.d/common-auth", "/etc/pam.d/common-account", "/etc/pam.d/common-password", "/etc/pam.d/common-session", "/etc/pam.d/common-session-noninteractive", "/usr/share/pam-configs/cyberpatriot-faillock-preauth", "/usr/share/pam-configs/cyberpatriot-faillock-authfail", "/etc/pam.d/passwd", "/etc/login.conf", "/etc/login.conf.db", "/etc/apt", "/var/lib/pam"]},
+    {"id": "pol", "name": "Password Policy", "script": "password_management/pwd_policy.sh", "configs": ["/etc/login.defs", "/etc/security/pwquality.conf", "/etc/security/faillock.conf", "/etc/pam.d/common-auth", "/etc/pam.d/common-account", "/etc/pam.d/common-password", "/etc/pam.d/common-session", "/etc/pam.d/common-session-noninteractive", "/usr/share/pam-configs/cyberpatriot-faillock-preauth", "/usr/share/pam-configs/cyberpatriot-faillock-authfail", "/etc/pam.d/passwd", "/etc/login.conf", "/etc/login.conf.db", "/etc/apt", "/var/lib/pam", "/etc/shadow"]},
     {"id": "log", "name": "Guest Login", "script": "config/login.sh", "configs": ["/etc/lightdm", "/etc/gdm3", "/etc/sddm.conf", "/usr/local/etc/lightdm", "/etc/passwd", "/etc/shadow", "/etc/group", "/etc/gshadow", "/etc/passwd-", "/etc/shadow-", "/etc/group-", "/etc/gshadow-", "/etc/master.passwd", "/etc/pwd.db", "/etc/spwd.db"]},
     {"id": "per", "name": "File Permissions", "script": "config/file_permissions.sh", "configs": ["/etc", "/usr/local/etc", "/usr/lib/systemd/system", "/usr/share/ca-certificates", "/usr/share/certs", "/etc/pki", "/usr/local/share/ca-certificates", "/usr/local/share/certs", "/lib/security", "/lib64/security", "/usr/lib/security", "/usr/lib64/security", "/boot/grub/grub.cfg", "/boot/grub2/grub.cfg", "/boot/efi/EFI/ubuntu/grub.cfg", "/boot/efi/EFI/centos/grub.cfg", "/boot/efi/EFI/redhat/grub.cfg", "/boot/loader/entries", "/etc/rc.d", "/usr/local/etc/rc.d", "/etc/rc.conf.d", "/usr/local/etc/rc.conf.d"]},
+    {"id": "updates-auto", "name": "Daily Update Checks", "script": "config/automatic_updates.sh", "configs": ["/etc/apt/apt.conf.d/20auto-upgrades"]},
     {"id": "cpkg", "name": "Package Comparison", "script": "compare/compare_pkgs.sh", "logs": ["log/pkgs_log.txt"]},
     {"id": "csvc", "name": "Service Comparison", "script": "compare/compare_services.sh", "logs": ["log/services_log.txt"]},
     {"id": "pkg", "name": "Bad Packages", "script": "rm_stuff/bad_pkg.sh", "edit_packages": True, "configs": ["/etc", "/usr/local/etc"]},
@@ -54,6 +54,8 @@ TASKS = [
 
 SERVICES = [
     {"id": "ufw", "name": "UFW Firewall", "script": "services/ufw.sh", "configs": ["/etc/ufw", "/etc/default/ufw"]},
+    {"id": "apache2", "name": "Apache2 Setup", "script": "services/apache2.sh", "configs": ["/etc/apache2"]},
+    {"id": "sshd", "name": "OpenSSH Server Setup", "script": "services/sshd.sh", "configs": ["/etc/ssh"]},
 ]
 
 AUTO_RUN_EXCLUDED_SCRIPTS = {
@@ -69,10 +71,9 @@ INPUT_FILES = [
     "compare/pkgs/safe_pkgs.txt",
     "compare/services/safe_services.txt",
 ]
-EDITABLE_INPUT_FILES = INPUT_FILES + ["input/auth_users.txt", "input/auth_admins.txt"]
+EDITABLE_INPUT_FILES = INPUT_FILES + ["input/authorized_accounts.txt"]
 INPUT_EDITOR_DETAILS = {
-    "input/auth_users.txt": ("Authorized Users", "Enter one authorized local username per line. Blank lines and lines beginning with # are ignored."),
-    "input/auth_admins.txt": ("Authorized Admins", "Enter each username followed by its password on the next line. Keep each username and password together; scripts read usernames and ignore password lines."),
+    "input/authorized_accounts.txt": ("Authorized Accounts", "Use the Authorized Administrators and Authorized Users headings. Put each administrator username on one line followed by an indented password: value line. Passwords are validated as input but existing scripts use only the usernames."),
     "compare/pkgs/safe_pkgs.txt": ("Trusted Package Reference", "Add one package name per line. Keep distribution-specific names; comparison results do not determine whether a package is safe."),
     "compare/services/safe_services.txt": ("Trusted Service Reference", "Add one service name and expected boot state per line, such as ssh.service enabled. Allowed states are enabled and disabled."),
 }
@@ -337,6 +338,34 @@ def _all_services() -> list[dict[str, Any]]:
     return result
 
 
+def _finding_items(path: Path) -> list[str]:
+    try:
+        if not path.is_file() or path.is_symlink():
+            return []
+        return list(dict.fromkeys(
+            match.group(1) for line in path.read_text(encoding="utf-8").splitlines()
+            if (match := re.fullmatch(r"\[(?:extra|enabled|active|disabled|inactive)\] ([A-Za-z0-9][A-Za-z0-9_.+@:-]*)", line))
+        ))
+    except OSError:
+        return []
+
+
+def _inventory_items(path: Path) -> set[str]:
+    try:
+        if not path.is_file() or path.is_symlink():
+            return set()
+        return {line.split()[0] for line in path.read_text(encoding="utf-8").splitlines() if line.split()}
+    except OSError:
+        return set()
+
+
+def _comparison_actions() -> dict[str, list[str]]:
+    return {
+        "packages": _finding_items(ROOT / "log" / "pkgs_log.txt"),
+        "services": _finding_items(ROOT / "log" / "services_log.txt"),
+    }
+
+
 def _task_by_script(script: str) -> dict[str, Any] | None:
     for task in TASKS:
         if task["script"] == script or task.get("second", {}).get("script") == script:
@@ -513,7 +542,38 @@ def dashboard():
         selected_distribution = next((line.strip() for line in distribution_file.read_text(encoding="utf-8").splitlines() if line.strip() and not line.lstrip().startswith("#")), "auto")
     except OSError:
         pass
-    return render_template("dashboard.html", tasks=_all_tasks(), services=_all_services(), inputs=INPUT_FILES, update=UPDATE_ACTION, update_status=update_status, update_files=update_files, aggregate=aggregate, selected_distribution=selected_distribution, update_review=url_for("review_run", backup_id=update_status["backup_id"]) if update_status.get("backup_id") else None)
+    return render_template("dashboard.html", tasks=_all_tasks(), services=_all_services(), inputs=INPUT_FILES, update=UPDATE_ACTION, update_status=update_status, update_files=update_files, aggregate=aggregate, selected_distribution=selected_distribution, update_review=url_for("review_run", backup_id=update_status["backup_id"]) if update_status.get("backup_id") else None, comparison_actions=_comparison_actions())
+
+
+@app.post("/manage-comparison-item")
+def manage_comparison_item():
+    kind = request.form.get("kind", "")
+    item = request.form.get("item", "")
+    if kind not in {"packages", "services"} or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.+@:-]*", item):
+        abort(400)
+    finding_file = ROOT / "log" / ("pkgs_log.txt" if kind == "packages" else "services_log.txt")
+    inventory_file = ROOT / "compare" / ("pkgs/unsafe_pkgs.txt" if kind == "packages" else "services/unsafe_services.txt")
+    if item not in _finding_items(finding_file) or item not in _inventory_items(inventory_file):
+        abort(409, "Run the corresponding comparison again before acting on a finding.")
+    distro = _distribution()
+    if distro not in {"ubuntu", "debian", "mint", "freebsd"}:
+        abort(400, "Unsupported distribution.")
+    privilege = _privilege_prefix()
+    if not privilege:
+        abort(403, "Configure noninteractive sudo/doas or graphical pkexec access.")
+    if kind == "packages":
+        command = (["pkg", "delete", "-y", item] if distro == "freebsd" else ["apt-get", "purge", "-y", "--", item])
+        action = "remove"
+    else:
+        if distro == "freebsd":
+            command = ["sysrc", f"{item}_enable=NO"]
+        else:
+            command = ["systemctl", "disable", "--now", item]
+        action = "disable"
+    result = subprocess.run([*privilege, *command], cwd=ROOT, capture_output=True, text=True, check=False)
+    if result.returncode:
+        return jsonify({"error": result.stderr.strip() or f"Could not {action} {item}."}), 500
+    return redirect(url_for("dashboard"))
 
 
 @app.post("/run/<path:script>")
@@ -554,9 +614,16 @@ def _execute_auto_run(run_id: str) -> None:
         print("Starting eligible scripts concurrently:", file=output, flush=True)
         for script in AUTO_RUN_SCRIPTS:
             print(f"===== {script} =====", file=output, flush=True)
+        start_gate = threading.Barrier(len(AUTO_RUN_SCRIPTS)) if AUTO_RUN_SCRIPTS else None
+
+        def run_together(script: str) -> None:
+            if start_gate is not None:
+                start_gate.wait()
+            _execute_script(script, script_run_ids[script])
+
         with ThreadPoolExecutor(max_workers=max(1, len(AUTO_RUN_SCRIPTS))) as executor:
             futures = {
-                executor.submit(_execute_script, script, script_run_ids[script]): script
+                executor.submit(run_together, script): script
                 for script in AUTO_RUN_SCRIPTS
             }
             for future in as_completed(futures):

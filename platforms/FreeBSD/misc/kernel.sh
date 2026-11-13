@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../service_helpers/platform.sh"
 require_freebsd_root
 source "$SCRIPT_DIR/../../../main/logging.sh"
+source "$SCRIPT_DIR/../../../service_helpers/authorized_accounts.sh"
 init_logging
 require_commands sysctl pw mount awk install
 mkdir -p /var/backups
@@ -12,32 +13,25 @@ backup=$(mktemp -d /var/backups/cyberpatriot-kernel.XXXXXX)
 log "Hardening configuration backups: $backup"
 
 load_admin_allowlist() {
-    local file="$SCRIPT_DIR/../../../input/auth_admins.txt" line uid
+    local file="$SCRIPT_DIR/../../../input/authorized_accounts.txt" name uid
     ADMIN_USERS=()
-    [[ -r "$file" ]] || { log "FAILED: cannot read $file"; return 1; }
-    local skip_password=0
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        if ((skip_password)); then skip_password=0; continue; fi
-        line=${line%$'\r'}
-        line="${line#"${line%%[![:space:]]*}"}"
-        line="${line%"${line##*[![:space:]]}"}"
-        [[ -z "$line" || "$line" == \#* ]] && continue
-        skip_password=1
-        [[ "$line" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*[$]?$ ]] || {
-            log "FAILED: invalid administrator username: $line"; return 1;
+    parse_authorized_accounts "$file" || { log 'FAILED: could not parse authorized_accounts.txt'; return 1; }
+    for name in "${!AUTHORIZED_ADMINS[@]}"; do
+        [[ "$name" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*[$]?$ ]] || {
+            log 'FAILED: invalid administrator username in authorized_accounts.txt'; return 1;
         }
-        pw usershow -n "$line" >/dev/null 2>&1 || {
-            log "FAILED: local administrator does not exist: $line"; return 1;
+        pw usershow -n "$name" >/dev/null 2>&1 || {
+            log "FAILED: local administrator does not exist: $name"; return 1;
         }
-        uid=$(id -u "$line") || return 1
+        uid=$(id -u "$name") || return 1
         if [[ "$uid" == 0 ]]; then
-            [[ "$line" == root ]] || { log "FAILED: unexpected UID-zero account: $line"; return 1; }
+            [[ "$name" == root ]] || { log "FAILED: unexpected UID-zero account: $name"; return 1; }
             continue
         fi
-        [[ " ${ADMIN_USERS[*]} " == *" $line "* ]] || ADMIN_USERS+=("$line")
-    done < "$file"
+        [[ " ${ADMIN_USERS[*]} " == *" $name "* ]] || ADMIN_USERS+=("$name")
+    done
     ((${#ADMIN_USERS[@]} > 0)) || {
-        log 'FAILED: auth_admins.txt must contain an existing non-root administrator'; return 1;
+        log 'FAILED: authorized_accounts.txt must contain an existing non-root administrator'; return 1;
     }
 }
 
@@ -84,7 +78,7 @@ configure_admin_access() {
             had_rule=1
         fi
         {
-            printf '// Managed by main/kernel.sh from input/auth_admins.txt.\n'
+            printf '// Managed by main/kernel.sh from input/authorized_accounts.txt.\n'
             printf 'polkit.addAdminRule(function(action, subject) {\n    return ["unix-user:root"'
             for user in "${ADMIN_USERS[@]}"; do printf ', "unix-user:%s"' "$user"; done
             printf '];\n});\n'
@@ -92,7 +86,7 @@ configure_admin_access() {
     fi
     cp -p "$sudoers" "$backup/sudoers" || return 1
     {
-        printf '# Managed by main/kernel.sh from input/auth_admins.txt.\n'
+        printf '# Managed by main/kernel.sh from input/authorized_accounts.txt.\n'
         printf '# Old include directives are deliberately inactive.\n'
         printf 'Defaults env_reset\nDefaults use_pty\nDefaults timestamp_timeout=0\n'
         printf 'root ALL=(ALL:ALL) ALL\n'

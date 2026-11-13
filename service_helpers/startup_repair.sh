@@ -11,7 +11,8 @@ repair_immutable_files() {
     command -v lsattr >/dev/null && command -v chattr >/dev/null || {
         log 'FAILED: lsattr/chattr required for initial immutable-file repair'; return 1;
     }
-    for root in /etc /var/lib/dpkg /var/lib/apt /var/cache/apt; do
+    for root in /etc /usr/local/etc /usr/share/pam-configs \
+                /var/lib/dpkg /var/lib/apt /var/cache/apt /var/lib/pam; do
         [[ -d "$root" && ! -L "$root" ]] || continue
         listing=$(mktemp) || return 1
         find -P "$root" -xdev \( -type f -o -type d \) -print0 > "$listing" || { rm -f "$listing"; return 1; }

@@ -11,6 +11,7 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../config/logging.sh"
+source "$SCRIPT_DIR/../service_helpers/authorized_accounts.sh"
 SYSCTL_FILE="/etc/sysctl.d/99-hardening.conf"
 
 # Ensure root
@@ -64,37 +65,30 @@ add_sysctl_setting() {
 ###############################################################################
 
 load_admin_allowlist() {
-    local file="$SCRIPT_DIR/../input/auth_admins.txt" line uid
+    local file="$SCRIPT_DIR/../input/authorized_accounts.txt" name uid
     ADMIN_USERS=()
-    [[ -r "$file" ]] || { log "FAILED: cannot read $file"; return 1; }
-    local skip_password=0
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        if ((skip_password)); then skip_password=0; continue; fi
-        line="${line%$'\r'}"
-        line="${line#"${line%%[![:space:]]*}"}"
-        line="${line%"${line##*[![:space:]]}"}"
-        [[ -z "$line" || "$line" == \#* ]] && continue
-        skip_password=1
+    parse_authorized_accounts "$file" || { log 'FAILED: could not parse authorized_accounts.txt'; return 1; }
+    for name in "${!AUTHORIZED_ADMINS[@]}"; do
         # Keep generated sudoers and JavaScript free of injected syntax.
-        [[ "$line" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*[$]?$ ]] || {
-            log "FAILED: invalid administrator username: $line"; return 1;
+        [[ "$name" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*[$]?$ ]] || {
+            log 'FAILED: invalid administrator username in authorized_accounts.txt'; return 1;
         }
-        uid=$(id -u -- "$line") || { log "FAILED: account does not exist: $line"; return 1; }
+        uid=$(id -u -- "$name") || { log "FAILED: account does not exist: $name"; return 1; }
         if [[ "$uid" == 0 ]]; then
-            [[ "$line" == root ]] || { log "FAILED: unexpected UID-zero account: $line"; return 1; }
+            [[ "$name" == root ]] || { log "FAILED: unexpected UID-zero account: $name"; return 1; }
             continue
         fi
-        [[ " ${ADMIN_USERS[*]} " == *" $line "* ]] || ADMIN_USERS+=("$line")
-    done < "$file"
+        [[ " ${ADMIN_USERS[*]} " == *" $name "* ]] || ADMIN_USERS+=("$name")
+    done
     ((${#ADMIN_USERS[@]} > 0)) || {
-        log "FAILED: auth_admins.txt must contain at least one existing non-root administrator"; return 1;
+        log "FAILED: authorized_accounts.txt must contain at least one existing non-root administrator"; return 1;
     }
 }
 
 write_admin_sudoers() {
     local user
     cat <<'SUDOERS'
-# Managed by main/kernel.sh using input/auth_admins.txt.
+# Managed by main/kernel.sh using input/authorized_accounts.txt.
 # Deliberately no include directives: old grants must not bypass the allowlist.
 Defaults env_reset
 Defaults use_pty
@@ -109,7 +103,7 @@ SUDOERS
 write_admin_polkit() {
     local user
     cat <<'POLKIT'
-// Managed by main/kernel.sh using input/auth_admins.txt.
+// Managed by main/kernel.sh using input/authorized_accounts.txt.
 polkit.addAdminRule(function(action, subject) {
     return ["unix-user:root"
 POLKIT

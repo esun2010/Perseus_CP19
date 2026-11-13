@@ -40,6 +40,14 @@ run_system() {
     else fail 'System package setup requires root, sudo, or doas.'; fi
 }
 
+printf 'Checking protected configuration and package files for blocking immutable flags.\n'
+printf 'See SETUP.md for the exact scan paths and permission changes.\n'
+if (( EUID == 0 )) || [[ -n "$PRIVILEGE_CMD" ]]; then
+    run_system bash "$SCRIPT_DIR/service_helpers/setup_mutability.sh" || fail 'Could not clear blocking immutable/append-only flags from managed configuration paths.'
+else
+    printf 'No root helper is available; skipped immutable-flag repair for protected system paths.\n' >&2
+fi
+
 if (( ! SKIP_SYSTEM_SETUP )); then
     case "$DISTRO" in
         ubuntu|debian|mint)

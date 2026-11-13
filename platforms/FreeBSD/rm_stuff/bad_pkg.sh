@@ -11,7 +11,7 @@ main() {
     require_freebsd_root
     require_commands pkg grep
     init_logging
-    local -a candidates=(nmap netcat john hydra medusa ophcrack hashcat wireshark aircrack-ng kismet tor deluge transmission-cli transmission-daemon sqlmap nikto)
+    local -a candidates=(nmap netcat john hydra medusa ophcrack hashcat wireshark aisleriot doona xprobe aircrack-ng kismet tor deluge transmission-cli transmission-daemon sqlmap nikto)
     local package listing
     listing=$(pkg query -a '%n') || return 1
     for package in "${candidates[@]}"; do

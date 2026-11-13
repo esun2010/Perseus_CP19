@@ -20,8 +20,7 @@ and logging are shared with Linux. FreeBSD-specific operations stay here.
 
 1. Copy or clone the entire repository onto FreeBSD, retaining LF line endings.
 2. Edit these scenario lists first (one entry per line; comments are allowed):
-   - `input/auth_users.txt`: authorized local login names.
-   - `input/auth_admins.txt`: existing authorized administrator names.
+   - `input/authorized_accounts.txt`: authorized administrators with password fields, followed by authorized users.
 3. Open a root shell using `su -`, change into the repository root, and run:
 
    ```sh
@@ -215,7 +214,7 @@ Run the fixture tests instead of executing hardening scripts on a development wo
 
 ### First-pass review and second-pass cleanup
 
-Populate `input/auth_users.txt` and `input/auth_admins.txt` first. At least one existing non-root administrator is required; administrator entries also count as authorized users. In `main/run_all.sh`, select `usr mp3` to generate the account and media inventories. These two first-pass tasks only report; they do not delete users or media. Other first-launcher tasks retain their existing behavior.
+Populate both sections in `input/authorized_accounts.txt` first. At least one existing non-root administrator is required; administrator entries also count as authorized users. In `main/run_all.sh`, select `usr mp3` to generate the account and media inventories. These two first-pass tasks only report; they do not delete users or media. Other first-launcher tasks retain their existing behavior.
 
 Review `log/unauth_users(2).txt`, `log/unauth_admins(2).txt`, and `log/media_files(2).txt`. Remove or comment out whole candidate lines for accounts/files that must be retained, or correct the allowlists and rerun the audit. The account reports contain usernames and their numeric UIDs; the media report contains an identity signature, a tab, and the absolute path. Do not edit those identity fields.
 

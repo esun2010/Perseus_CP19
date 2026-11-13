@@ -3,6 +3,9 @@
 /main/.run_all_status.*
 /test
 
+# Local account allowlist contains plaintext scenario passwords
+/input/authorized_accounts.txt
+
 # Generated second-pass reports and dashboard transcripts
 /log/*(2).txt
 /main/all_logs(2).txt

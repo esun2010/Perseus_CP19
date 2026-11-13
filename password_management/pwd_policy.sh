@@ -80,7 +80,7 @@ configure_login_defaults() {
     if [[ -f /etc/login.defs ]] && awk '$1 == "ENCRYPT_METHOD" { value=$2 } END { exit(value != "YESCRYPT") }' /etc/login.defs; then
         encryption=YESCRYPT
     fi
-    for setting in PASS_MAX_DAYS:90 PASS_MIN_DAYS:1 PASS_WARN_AGE:7 \
+    for setting in PASS_MAX_DAYS:90 PASS_MIN_DAYS:7 PASS_WARN_AGE:7 \
         UID_MIN:1000 UID_MAX:60000 SYS_UID_MIN:100 SYS_UID_MAX:999 \
         GID_MIN:1000 GID_MAX:60000 SYS_GID_MIN:100 SYS_GID_MAX:999 \
         UMASK:027 HOME_MODE:0750 LOGIN_RETRIES:5 LOGIN_TIMEOUT:60 \
@@ -98,14 +98,18 @@ configure_existing_account_aging() {
         if [[ "$name" != root ]] && { ((uid < uid_min)) || [[ "$shell" == */nologin || "$shell" == */false || "$shell" == */sync || "$shell" == */halt || "$shell" == */shutdown ]]; }; then
             continue
         fi
-        chage --mindays 1 --maxdays 90 --warndays 7 "$name" || {
+        chage --mindays 7 --maxdays 90 --warndays 7 "$name" || {
             log "FAILED applying password aging to existing account: $name"; return 1;
         }
         ((count+=1))
     done < /etc/passwd
-    log "Applied 1-day minimum, 90-day maximum, and 7-day warning to $count existing interactive local accounts, including root"
+    log "Applied 7-day minimum, 90-day maximum, and 7-day warning to $count existing interactive local accounts, including root"
 }
 configure_existing_account_aging
+passwd -l root || { log 'FAILED locking the root password'; exit 1; }
+root_status=$(passwd -S root) || { log 'FAILED verifying root password status'; exit 1; }
+[[ " $root_status " == *' L '* ]] || { log 'FAILED: root password is not locked'; exit 1; }
+log 'LOCKED root password authentication; sudo access remains available'
 configure_pwquality() {
     local setting
     for setting in minlen:12 dcredit:-1 ucredit:-1 lcredit:-1 ocredit:-1 \

@@ -13,12 +13,13 @@ source "$SCRIPT_DIR/service_helpers/distribution.sh"
 load_distribution || exit 1
 source "$SCRIPT_DIR/service_helpers/task_paths.sh"
 # CyberPatriot scoring tasks.
-ORDER=(usr mp3 ker sys pol log per pkg cpkg csvc mal)
+ORDER=(usr mp3 ker sys pol log per updates-auto pkg cpkg csvc mal)
 declare -A SCRIPT_MAP=(
     [sys]=config/system_hardening.sh
     [ker]=config/kernel.sh
     [log]=config/login.sh
     [per]=config/file_permissions.sh
+    [updates-auto]=config/automatic_updates.sh
     [pol]=password_management/pwd_policy.sh
     [usr]=user_management/user_management.sh
     [mp3]=rm_stuff/rm_mp3+.sh
@@ -35,6 +36,7 @@ declare -A DESCRIPTION=(
     [pol]='Password Policy'
     [log]='Guest Login'
     [per]='File Permissions'
+    [updates-auto]='Daily Update Checks'
     [pkg]='Bad Packages'
     [cpkg]='Package Comparison'
     [csvc]='Service Comparison'
