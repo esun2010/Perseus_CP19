@@ -423,10 +423,17 @@ def _config_candidates(script: str, task: dict[str, Any] | None) -> list[str]:
     result: list[str] = []
     for raw in ordered:
         path = Path(raw)
+
         if any(path != parent and parent in path.parents for parent in roots):
             continue
+
         result.append(raw)
-        if path.is_dir() and not path.is_symlink(): roots.append(path)
+
+        try:
+            if path.is_dir() and not path.is_symlink():
+                roots.append(path)
+        except OSError:
+            continue
     return result
 
 
@@ -610,8 +617,8 @@ def _execute_auto_run(run_id: str) -> None:
     if RUNS.get("__auto_run__", {}).get("run_id") == run_id:
         RUNS["__auto_run__"]["output"] = str(output_path.relative_to(ROOT))
     results = []
-    with output_path.open("ab") as output:
-        print("Starting eligible scripts concurrently:", file=output, flush=True)
+    with output_path.open("a", encoding="utf-8") as output:
+        print("Starting eligible scripts concurrently:", file=output, flush=True)    
         for script in AUTO_RUN_SCRIPTS:
             print(f"===== {script} =====", file=output, flush=True)
         start_gate = threading.Barrier(len(AUTO_RUN_SCRIPTS)) if AUTO_RUN_SCRIPTS else None
@@ -719,7 +726,13 @@ def edit_input(relpath: str):
         abort(404)
     path = _resolve_repo_file(relpath)
     if not path.is_file() or path.is_symlink():
-        return _render_input_editor(relpath, path.name, "", "This input file is missing or is not a regular file."), 404
+    	return _render_input_editor(
+        	relpath,
+        	path.name,
+        	"",
+        	"This input file is missing or is not a regular file.",
+        	404
+    	)
     try:
         contents = path.read_text(encoding="utf-8")
     except OSError as exc:
