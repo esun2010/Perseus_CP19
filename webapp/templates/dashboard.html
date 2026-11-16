@@ -54,14 +54,6 @@
   </section>
   {% endfor %}
 
-  <section class="panel" aria-labelledby="comparison-actions-title">
-    <div class="section-heading"><div><h2 id="comparison-actions-title">Extra packages and services</h2></div><p>Run Package Comparison or Service Comparison to refresh these lists. Actions apply immediately.</p></div>
-    <h3>Extra packages</h3>
-    {% if comparison_actions.packages %}<div class="action-list">{% for item in comparison_actions.packages %}<div class="backup-item"><strong>{{ item }}</strong><form method="post" action="{{ url_for('manage_comparison_item') }}"><input type="hidden" name="kind" value="packages"><input type="hidden" name="item" value="{{ item }}"><button class="button danger" type="submit">Remove package</button></form></div>{% endfor %}</div>{% else %}<p>No package findings loaded. Run Package Comparison to populate this list.</p>{% endif %}
-    <h3>Extra services</h3>
-    {% if comparison_actions.services %}<div class="action-list">{% for item in comparison_actions.services %}<div class="backup-item"><strong>{{ item }}</strong><form method="post" action="{{ url_for('manage_comparison_item') }}"><input type="hidden" name="kind" value="services"><input type="hidden" name="item" value="{{ item }}"><button class="button danger" type="submit">Disable service</button></form></div>{% endfor %}</div>{% else %}<p>No service findings loaded. Run Service Comparison to populate this list.</p>{% endif %}
-  </section>
-
   <section class="panel services-panel" aria-labelledby="services-title">
     <div class="section-heading"><div><span class="section-number">{{ tasks|length + 3 }}</span><h2 id="services-title">Services</h2></div><p>Choose a service configuration to run. Services are excluded from Auto-run.</p></div>
     <label for="service-select">Service</label>

@@ -192,10 +192,6 @@ fi
 cd "$SCRIPT_DIR"
 printf 'Starting the dashboard at http://127.0.0.1:%s\n' "$PORT"
 if (( EUID == 0 )); then
-    DASHBOARD_USER="${SUDO_USER:-}"
-    if [[ -n "$DASHBOARD_USER" ]] && id "$DASHBOARD_USER" >/dev/null 2>&1; then
-        exec su -m "$DASHBOARD_USER" -c "exec env CYBERPATRIOT_HOST=127.0.0.1 CYBERPATRIOT_PORT=$PORT $VENV_PYTHON $MAIN_DIR/run_dashboard.py"
-    fi
-    fail 'When setup.sh is run as root, set SUDO_USER to the desktop account so the dashboard can stay unprivileged.'
+    exec env CYBERPATRIOT_HOST=127.0.0.1 CYBERPATRIOT_PORT="$PORT" "$VENV_PYTHON" "$MAIN_DIR/run_dashboard.py"
 fi
 exec env CYBERPATRIOT_HOST=127.0.0.1 "CYBERPATRIOT_PORT=$PORT" "$VENV_PYTHON" "$MAIN_DIR/run_dashboard.py"

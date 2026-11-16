@@ -16,11 +16,6 @@ for directory in /etc/pam.d /usr/share/pam-configs /var/lib/pam; do
         log "FAILED: expected regular configuration directory: $directory"; exit 1;
     }
 done
-for file in /etc/pam.d/common-auth /etc/pam.d/common-account /etc/pam.d/common-password; do
-    [[ -f "$file" && ! -L "$file" ]] || {
-        log "FAILED: missing or redirected PAM stack: $file"; exit 1;
-    }
-done
 [[ ! -L /etc/security && ( ! -e /etc/security || -d /etc/security ) ]] || {
     log 'FAILED: unexpected /etc/security layout'; exit 1;
 }
@@ -39,13 +34,26 @@ backup_system_paths /etc/pam.d /etc/login.defs /etc/security /var/lib/pam \
 backup=$SYSTEM_BACKUP_DIR
 log "Password/PAM configuration backup: $backup"
 [[ -d /etc/security ]] || install -d -m 755 /etc/security
+# PAM stacks missing or malformed enough for pam-auth-update to refuse its
+# normal merge are rebuilt from the distribution defaults. Preserve the
+# originals in the snapshot above so they remain reviewable/restorable.
+for file in /etc/pam.d/common-auth /etc/pam.d/common-account /etc/pam.d/common-password; do
+    if [[ ! -e "$file" ]]; then
+        install -o root -g root -m 644 /dev/null "$file"
+        log "CREATED missing PAM stack: $file"
+    elif [[ ! -f "$file" || -L "$file" ]]; then
+        log "FAILED: unsafe PAM stack path cannot be replaced automatically: $file"; exit 1
+    fi
+done
 # Preserve custom stacks: never pass --force to pam-auth-update.
 if ! dpkg-query -W -f='${Status}' libpam-pwquality 2>/dev/null | grep -qx 'install ok installed'; then
     apt-get update
     backup_package_configuration
     apt-get install -y libpam-pwquality
 fi
-[[ -f /usr/share/pam-configs/pwquality ]] || { log 'FAILED: packaged pwquality PAM profile is missing'; exit 1; }
+if [[ ! -f /usr/share/pam-configs/pwquality ]]; then
+    log 'FAILED: packaged pwquality PAM profile is missing'; exit 1
+fi
 module_found=0
 for file in /lib/security/pam_faillock.so /lib64/security/pam_faillock.so \
             /usr/lib/security/pam_faillock.so /usr/lib64/security/pam_faillock.so \

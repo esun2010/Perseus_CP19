@@ -545,37 +545,6 @@ def dashboard():
     return render_template("dashboard.html", tasks=_all_tasks(), services=_all_services(), inputs=INPUT_FILES, update=UPDATE_ACTION, update_status=update_status, update_files=update_files, aggregate=aggregate, selected_distribution=selected_distribution, update_review=url_for("review_run", backup_id=update_status["backup_id"]) if update_status.get("backup_id") else None, comparison_actions=_comparison_actions())
 
 
-@app.post("/manage-comparison-item")
-def manage_comparison_item():
-    kind = request.form.get("kind", "")
-    item = request.form.get("item", "")
-    if kind not in {"packages", "services"} or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.+@:-]*", item):
-        abort(400)
-    finding_file = ROOT / "log" / ("pkgs_log.txt" if kind == "packages" else "services_log.txt")
-    inventory_file = ROOT / "compare" / ("pkgs/unsafe_pkgs.txt" if kind == "packages" else "services/unsafe_services.txt")
-    if item not in _finding_items(finding_file) or item not in _inventory_items(inventory_file):
-        abort(409, "Run the corresponding comparison again before acting on a finding.")
-    distro = _distribution()
-    if distro not in {"ubuntu", "debian", "mint", "freebsd"}:
-        abort(400, "Unsupported distribution.")
-    privilege = _privilege_prefix()
-    if not privilege:
-        abort(403, "Configure noninteractive sudo/doas or graphical pkexec access.")
-    if kind == "packages":
-        command = (["pkg", "delete", "-y", item] if distro == "freebsd" else ["apt-get", "purge", "-y", "--", item])
-        action = "remove"
-    else:
-        if distro == "freebsd":
-            command = ["sysrc", f"{item}_enable=NO"]
-        else:
-            command = ["systemctl", "disable", "--now", item]
-        action = "disable"
-    result = subprocess.run([*privilege, *command], cwd=ROOT, capture_output=True, text=True, check=False)
-    if result.returncode:
-        return jsonify({"error": result.stderr.strip() or f"Could not {action} {item}."}), 500
-    return redirect(url_for("dashboard"))
-
-
 @app.post("/run/<path:script>")
 def run_script(script: str):
     if script != "updates":
